@@ -2898,6 +2898,8 @@ export type JapanVipContentStatus =
   | "review"
   | "approved";
 
+export type JapanVipAiProvider = "codex" | "claude";
+
 export interface JapanVipSource {
   id: string;
   url: string;
@@ -2917,6 +2919,7 @@ export interface JapanVipContentProject {
   primaryUrl: string;
   targetKeyword: string;
   audience: string;
+  aiProvider: JapanVipAiProvider;
   status: JapanVipContentStatus;
   sources: JapanVipSource[];
   selectedReferenceIds: string[];
@@ -2957,6 +2960,7 @@ export const updateJapanVipContentProject = (
       | "primaryUrl"
       | "targetKeyword"
       | "audience"
+      | "aiProvider"
       | "status"
       | "facts"
       | "selectedReferenceIds"
@@ -3050,6 +3054,7 @@ export const addJapanVipReferenceArticle = (input: {
   url: string;
   kind: JapanVipReferenceKind;
   tags?: string[];
+  aiProvider?: JapanVipAiProvider;
 }) => post<JapanVipLearningLibrary>("/api/japanvip-learning/articles", input);
 
 export const updateJapanVipReferenceArticle = (

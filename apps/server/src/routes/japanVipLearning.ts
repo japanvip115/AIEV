@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { Router } from "express";
 import { extractArticleFromUrl } from "../article.js";
 import { extractJson } from "../aiText.js";
-import { generateCodexText } from "../codexText.js";
+import { generateJapanVipText, parseJapanVipAiProvider } from "../japanVipAi.js";
 import {
   addJapanVipLearningRule,
   normalizeStyleAnalysis,
@@ -36,6 +36,7 @@ router.post("/articles", async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const kind = typeof body.kind === "string" ? body.kind as JapanVipReferenceKind : "competitor";
+  const aiProvider = parseJapanVipAiProvider(body.aiProvider);
   if (!url) throw new HttpError(400, "INVALID_URL", "Thiếu URL bài viết cần học");
   if (!KINDS.has(kind)) throw new HttpError(400, "INVALID_REFERENCE_KIND", "Loại bài tham khảo không hợp lệ");
   const library = readJapanVipLearningLibrary();
@@ -55,7 +56,7 @@ router.post("/articles", async (req, res) => {
     `LOẠI TÀI LIỆU: ${kind}`,
     `NỘI DUNG:\n${text.slice(0, 24_000)}`,
   ].join("\n\n");
-  const ai = await generateCodexText({ prompt, usageTag: "japanvip-learn" });
+  const ai = await generateJapanVipText(aiProvider, { prompt, usageTag: "japanvip-learn" });
   const parsed = extractJson<Record<string, unknown>>(ai.text);
   if (!parsed) throw new HttpError(502, "REFERENCE_ANALYSIS_FAILED", "AI không trả về phân tích bài viết hợp lệ");
   const now = nowIso();

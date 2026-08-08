@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { paths } from "./config.js";
 import { HttpError, ensureDir, nowIso, toKebabAscii } from "./util.js";
+import type { JapanVipAiProvider } from "./japanVipAi.js";
 
 export type JapanVipContentStatus =
   | "draft"
@@ -37,6 +38,7 @@ export interface JapanVipContentProject {
   primaryUrl: string;
   targetKeyword: string;
   audience: string;
+  aiProvider: JapanVipAiProvider;
   status: JapanVipContentStatus;
   sources: JapanVipSource[];
   selectedReferenceIds: string[];
@@ -52,6 +54,7 @@ export interface JapanVipContentProject {
 function normalizeProject(project: JapanVipContentProject): JapanVipContentProject {
   return {
     ...project,
+    aiProvider: project.aiProvider === "claude" ? "claude" : "codex",
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
     feedback: Array.isArray(project.feedback) ? project.feedback : [],
   };
@@ -121,6 +124,7 @@ export function createJapanVipContent(input: {
     primaryUrl: input.primaryUrl?.trim() ?? "",
     targetKeyword: "",
     audience: "Khách hàng Việt Nam quan tâm sản phẩm Nhật Bản cao cấp",
+    aiProvider: "codex",
     status: "draft",
     sources: [],
     selectedReferenceIds: [],

@@ -18,6 +18,7 @@ import {
   updateJapanVipLearningRule,
   updateJapanVipReferenceArticle,
   type JapanVipLearningLibrary,
+  type JapanVipAiProvider,
   type JapanVipReferenceKind,
 } from "@/lib/api";
 
@@ -31,6 +32,7 @@ export default function JapanVipLearningPage() {
   const [library, setLibrary] = useState<JapanVipLearningLibrary | null>(null);
   const [url, setUrl] = useState("");
   const [kind, setKind] = useState<JapanVipReferenceKind>("competitor");
+  const [aiProvider, setAiProvider] = useState<JapanVipAiProvider>("codex");
   const [tags, setTags] = useState("");
   const [rule, setRule] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -74,18 +76,22 @@ export default function JapanVipLearningPage() {
         <p className="mb-3 text-sm text-[var(--text-muted)]">
           AI sẽ bóc tách cách trình bày, bố cục và kỹ thuật thuyết phục. Hệ thống không được sao chép câu chữ hoặc lấy claim sản phẩm từ bài này.
         </p>
-        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_180px_220px_auto]">
+        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_170px_190px_210px_auto]">
           <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Dán URL bài đối thủ hoặc bài cần học…" />
           <select className="input" value={kind} onChange={(e) => setKind(e.target.value as JapanVipReferenceKind)}>
             {Object.entries(KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
+          <select className="input" aria-label="AI phân tích" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as JapanVipAiProvider)}>
+            <option value="codex">ChatGPT (Codex CLI)</option>
+            <option value="claude">Claude Code</option>
+          </select>
           <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Nồi cơm, mở bài, SEO…" />
           <Button disabled={!url.trim() || busy !== null} onClick={() => void run("add-article", async () => {
-            const next = await addJapanVipReferenceArticle({ url: url.trim(), kind, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) });
+            const next = await addJapanVipReferenceArticle({ url: url.trim(), kind, aiProvider, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) });
             setUrl("");
             setTags("");
             return next;
-          })}><Plus size={15} /> {busy === "add-article" ? "AI đang phân tích…" : "Thêm và phân tích"}</Button>
+          })}><Plus size={15} /> {busy === "add-article" ? `${aiProvider === "codex" ? "ChatGPT" : "Claude"} đang phân tích…` : "Thêm và phân tích"}</Button>
         </div>
       </Card>
 

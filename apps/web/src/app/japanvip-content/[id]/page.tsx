@@ -21,6 +21,7 @@ import {
   getJapanVipLearningLibrary,
   updateJapanVipContentProject,
   type JapanVipContentProject,
+  type JapanVipAiProvider,
   type JapanVipContentStatus,
   type JapanVipLearningLibrary,
 } from "@/lib/api";
@@ -100,6 +101,20 @@ export default function JapanVipContentDetailPage() {
     );
   }
 
+  async function chooseProvider(aiProvider: JapanVipAiProvider) {
+    setBusy("provider");
+    setError(null);
+    try {
+      const next = await updateJapanVipContentProject(id, { aiProvider });
+      setProject((current) => current ? { ...current, aiProvider: next.aiProvider, updatedAt: next.updatedAt } : current);
+      setDraft((current) => current ? { ...current, aiProvider: next.aiProvider, updatedAt: next.updatedAt } : current);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (!draft) {
     return <div className="flex flex-col gap-4">{error && <ErrorBanner message="Không mở được project" detail={error} />}</div>;
   }
@@ -135,6 +150,15 @@ export default function JapanVipContentDetailPage() {
               <Field label="Trạng thái" htmlFor="jvc-status">
                 <select id="jvc-status" className="input" value={draft.status} onChange={(e) => patch("status", e.target.value as JapanVipContentStatus)}>
                   {Object.entries(STATUS).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                </select>
+              </Field>
+              <Field label="AI sử dụng" htmlFor="jvc-ai-provider">
+                <select id="jvc-ai-provider" className="input" value={draft.aiProvider} disabled={busy !== null} onChange={(e) => {
+                  const aiProvider = e.target.value as JapanVipAiProvider;
+                  void chooseProvider(aiProvider);
+                }}>
+                  <option value="codex">ChatGPT (Codex CLI)</option>
+                  <option value="claude">Claude Code</option>
                 </select>
               </Field>
             </div>
@@ -211,11 +235,11 @@ export default function JapanVipContentDetailPage() {
             </div>
           </Card>
 
-          <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : "AI tạo dàn ý"}</Button>}>
+          <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : `${draft.aiProvider === "codex" ? "ChatGPT" : "Claude"} tạo dàn ý`}</Button>}>
             <textarea className="input min-h-72 resize-y font-mono text-sm" value={draft.outline} onChange={(e) => patch("outline", e.target.value)} placeholder="## Tổng quan sản phẩm…" />
           </Card>
 
-          <Card title="Bài viết Markdown" actions={<Button small disabled={busy !== null || !draft.outline.trim()} onClick={() => void run("article", () => generateJapanVipArticle(id))}><Sparkles size={14} /> {busy === "article" ? "Đang viết…" : "AI viết bài"}</Button>}>
+          <Card title="Bài viết Markdown" actions={<Button small disabled={busy !== null || !draft.outline.trim()} onClick={() => void run("article", () => generateJapanVipArticle(id))}><Sparkles size={14} /> {busy === "article" ? "Đang viết…" : `${draft.aiProvider === "codex" ? "ChatGPT" : "Claude"} viết bài`}</Button>}>
             <textarea className="input min-h-[560px] resize-y font-mono text-sm leading-6" value={draft.article} onChange={(e) => patch("article", e.target.value)} placeholder="Bài viết hoàn chỉnh sẽ xuất hiện tại đây…" />
           </Card>
 

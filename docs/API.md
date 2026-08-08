@@ -1215,6 +1215,8 @@ DELETE /api/japanvip-learning/rules/:ruleId
 - Project chọn bài mẫu qua `selectedReferenceIds`. Dữ kiện sản phẩm vẫn chỉ lấy từ nguồn chính thức
   và fact sheet đã duyệt.
 - Phản hồi có `saveAsRule=true` được đưa vào bộ quy tắc dùng chung cho những lần viết sau.
+- Mỗi Content Project lưu `aiProvider: "codex" | "claude"`; tạo dàn ý và viết bài dùng đúng nhà
+  cung cấp đã chọn. Endpoint thêm bài mẫu nhận `aiProvider` riêng cho lượt phân tích đó.
 
 ## Update (cập nhật hệ thống từ GitHub — badge cuối sidebar)
 
