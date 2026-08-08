@@ -12,6 +12,7 @@ image-projects/
 # apps/web/src/app/text-to-video/ và nuốt mất trang web (đã dính với auto-cut)
 /text-to-video/
 /translate-video/
+/japanvip-content/
 engines/remotion/public/staging/*
 !engines/remotion/public/staging/.gitkeep
 outputs/

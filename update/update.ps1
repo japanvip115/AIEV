@@ -55,7 +55,7 @@ Write-Host ("  -> Cập nhật tới: " + $target) -ForegroundColor DarkGray
 # của máy, không đi theo repo", và nếu không có bước này thì ai cập nhật cũng
 # mất sạch thư viện của mình. .gitignore KHÔNG cứu được - nó chỉ chặn commit
 # file mới, không giữ lại file mà bản mới đã xóa.
-$userPaths = @(".claude\skills", "assets\styles", "assets\sound-effects", "assets\music", "assets\prompts")
+$userPaths = @(".claude\skills", "assets\styles", "assets\sound-effects", "assets\music", "assets\prompts", "japanvip-content")
 $bk = Join-Path $root ("start\backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 New-Item -ItemType Directory -Force $bk | Out-Null
 foreach ($p in $userPaths) {

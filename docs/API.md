@@ -1172,6 +1172,30 @@ GET /api/usage/timeline?days=30&scope=all|video|image
 - `days` clamp 1–365. UI Dashboard có bộ lọc 7/30/90 ngày + loại project (Tất cả/Video/Ảnh)
   và hiển thị chi tiết token in / token out.
 
+## Japan VIP Content
+
+Mô-đun biên tập bài sản phẩm tách biệt với Videos Project. Dữ liệu nằm tại
+`japanvip-content/<id>/project.json`, được `.gitignore` và script update sao lưu như dữ liệu người dùng.
+
+```text
+GET    /api/japanvip-content
+POST   /api/japanvip-content
+GET    /api/japanvip-content/:id
+PATCH  /api/japanvip-content/:id
+DELETE /api/japanvip-content/:id
+
+POST   /api/japanvip-content/:id/sources             { url }
+DELETE /api/japanvip-content/:id/sources/:sourceId
+POST   /api/japanvip-content/:id/generate-outline
+POST   /api/japanvip-content/:id/generate-article
+```
+
+- Nguồn URL đi qua cùng lớp `safeFetchHtml` và Readability của Text to video.
+- Fact sheet do người dùng nhập/duyệt là nguồn sự thật ưu tiên cho AI.
+- AI tạo dàn ý và bài Markdown bằng một lượt Claude không có tool; claim thiếu bằng chứng phải giữ
+  nhãn `[CẦN KIỂM CHỨNG]`.
+- MVP không có endpoint xuất bản CMS. Trạng thái `approved` chỉ ghi nhận đã duyệt nội bộ.
+
 ## Update (cập nhật hệ thống từ GitHub — badge cuối sidebar)
 
 ```

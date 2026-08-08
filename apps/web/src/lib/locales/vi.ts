@@ -1594,6 +1594,7 @@ export const vi: Record<string, string> = {
   // Tên tab do người dùng chỉ định - giữ nguyên tiếng Anh ở cả hai ngôn ngữ,
   // giống cách "Videos Project" và "Auto cut videos" đang làm.
   "nav.text-to-video": "Text to video",
+  "nav.japanvip-content": "Japan VIP Content",
 
   "ttv.subtitle":
     "Biến bài viết thành video - AI viết kịch bản, TTS đọc thành giọng, tạo sẵn Videos Project.",

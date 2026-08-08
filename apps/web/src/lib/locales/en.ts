@@ -1597,6 +1597,7 @@ export const en: Record<string, string> = {
   // Tab name chosen by the user - kept in English in both languages, same as
   // "Videos Project" and "Auto cut videos".
   "nav.text-to-video": "Text to video",
+  "nav.japanvip-content": "Japan VIP Content",
 
   "ttv.subtitle":
     "Turn an article into a video - AI writes the script, TTS reads it out, you get a Videos Project.",

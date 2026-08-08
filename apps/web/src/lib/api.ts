@@ -2889,6 +2889,105 @@ export const scriptTextToVideo = (
 export const buildTextToVideo = (id: string) =>
   post<{ jobId: string }>(`/api/text-to-video/${encodeURIComponent(id)}/build`);
 
+// ============ Japan VIP Content ============
+
+export type JapanVipContentStatus =
+  | "draft"
+  | "researching"
+  | "writing"
+  | "review"
+  | "approved";
+
+export interface JapanVipSource {
+  id: string;
+  url: string;
+  canonicalUrl: string | null;
+  title: string;
+  siteName: string | null;
+  lang: string | null;
+  leadImage: string | null;
+  text: string;
+  fetchedAt: string;
+}
+
+export interface JapanVipContentProject {
+  id: string;
+  name: string;
+  productModel: string;
+  primaryUrl: string;
+  targetKeyword: string;
+  audience: string;
+  status: JapanVipContentStatus;
+  sources: JapanVipSource[];
+  facts: string[];
+  outline: string;
+  article: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getJapanVipContentProjects = () =>
+  request<JapanVipContentProject[]>("/api/japanvip-content");
+
+export const getJapanVipContentProject = (id: string) =>
+  request<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}`);
+
+export const createJapanVipContentProject = (input: {
+  name: string;
+  productModel?: string;
+  primaryUrl?: string;
+}) => post<JapanVipContentProject>("/api/japanvip-content", input);
+
+export const updateJapanVipContentProject = (
+  id: string,
+  patch: Partial<
+    Pick<
+      JapanVipContentProject,
+      | "name"
+      | "productModel"
+      | "primaryUrl"
+      | "targetKeyword"
+      | "audience"
+      | "status"
+      | "facts"
+      | "outline"
+      | "article"
+      | "notes"
+    >
+  >
+) =>
+  jsonBody<JapanVipContentProject>(
+    `/api/japanvip-content/${encodeURIComponent(id)}`,
+    "PATCH",
+    patch
+  );
+
+export const deleteJapanVipContentProject = (id: string) =>
+  request<void>(`/api/japanvip-content/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const addJapanVipContentSource = (id: string, url: string) =>
+  post<JapanVipContentProject>(
+    `/api/japanvip-content/${encodeURIComponent(id)}/sources`,
+    { url }
+  );
+
+export const deleteJapanVipContentSource = (id: string, sourceId: string) =>
+  request<JapanVipContentProject>(
+    `/api/japanvip-content/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}`,
+    { method: "DELETE" }
+  );
+
+export const generateJapanVipOutline = (id: string) =>
+  post<JapanVipContentProject>(
+    `/api/japanvip-content/${encodeURIComponent(id)}/generate-outline`
+  );
+
+export const generateJapanVipArticle = (id: string) =>
+  post<JapanVipContentProject>(
+    `/api/japanvip-content/${encodeURIComponent(id)}/generate-article`
+  );
+
 export const getTtsModels = () => request<TtsModel[]>("/api/tts/models");
 
 /**

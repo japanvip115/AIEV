@@ -168,6 +168,8 @@ export const paths = {
   textToVideoDir: path.join(repoRoot, "text-to-video"),
   /** Dịch video - mỗi phiên một thư mục (video nguồn + transcript + bản dịch + output) */
   translateVideoDir: path.join(repoRoot, "translate-video"),
+  /** Japan VIP Content - dự án nghiên cứu và biên tập bài sản phẩm, tách khỏi video */
+  japanVipContentDir: path.join(repoRoot, "japanvip-content"),
   assetsDir: path.join(repoRoot, "assets"),
   /** Brand assets: logo + design-system.json cũ (nguồn migration sang Style Design) */
   brandDir: path.join(repoRoot, "assets", "brand"),
@@ -324,6 +326,7 @@ export function ensureBaseDirs(): void {
     paths.uploadTmpDir,
     paths.videoProjectsDir,
     paths.imageProjectsDir,
+    paths.japanVipContentDir,
     paths.stylesDir,
     paths.stylesFilesDir,
     paths.sfxDir,

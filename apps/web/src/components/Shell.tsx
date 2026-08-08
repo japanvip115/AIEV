@@ -36,6 +36,7 @@ import {
   LayoutDashboard,
   ListVideo,
   MessageSquare,
+  Newspaper,
   Mic,
   Palette,
   Shapes,
@@ -113,6 +114,7 @@ const NAV = [
   { href: "/images", label: "nav.images", icon: Images },
   { href: "/auto-cut", label: "nav.auto-cut", icon: Scissors },
   { href: "/text-to-video", label: "nav.text-to-video", icon: FileText },
+  { href: "/japanvip-content", label: "nav.japanvip-content", icon: Newspaper },
   // Ngay dưới Text to video theo đúng yêu cầu: hai tính năng đều "đưa nội dung
   // vào, nhận video ra", để cạnh nhau người dùng khỏi phải quét cả sidebar.
   { href: "/translate-video", label: "nav.translate-video", icon: Languages },

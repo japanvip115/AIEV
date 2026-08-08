@@ -47,7 +47,7 @@ printf '  \033[90m-> Cập nhật tới: %s\033[0m\n' "$TARGET"
 # của máy, không đi theo repo", và nếu không có bước này thì ai cập nhật cũng
 # mất sạch thư viện của mình. .gitignore KHÔNG cứu được - nó chỉ chặn commit
 # file mới, không giữ lại file mà bản mới đã xóa.
-USER_PATHS=(".claude/skills" "assets/styles" "assets/sound-effects" "assets/music" "assets/prompts")
+USER_PATHS=(".claude/skills" "assets/styles" "assets/sound-effects" "assets/music" "assets/prompts" "japanvip-content")
 BK="$ROOT/start/backup-$(date '+%Y%m%d-%H%M%S')"
 mkdir -p "$BK"
 for p in "${USER_PATHS[@]}"; do
