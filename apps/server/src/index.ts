@@ -56,6 +56,7 @@ import uploadSessionRouter from "./routes/uploadSession.js";
 import { GRADE_PRESETS } from "./color.js";
 import mediaRouter from "./routes/media.js";
 import japanVipContentRouter from "./routes/japanVipContent.js";
+import japanVipLearningRouter from "./routes/japanVipLearning.js";
 
 ensureBaseDirs();
 // Job còn treo "running" từ lần chạy trước (server bị tắt giữa chừng) → failed
@@ -181,6 +182,7 @@ app.use("/api/auto-cut", autoCutRouter);
 app.use("/api/text-to-video", textToVideoRouter);
 // Japan VIP Content: nghiên cứu nguồn -> fact sheet -> dàn ý -> bài nháp duyệt
 app.use("/api/japanvip-content", japanVipContentRouter);
+app.use("/api/japanvip-learning", japanVipLearningRouter);
 // Dịch video: phiên nguồn (video) -> bóc lời -> dịch -> ghép phụ đề
 app.use("/api/translate-video", translateVideoRouter);
 app.use("/api/tts", ttsRouter);

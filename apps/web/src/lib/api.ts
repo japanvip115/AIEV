@@ -2919,10 +2919,18 @@ export interface JapanVipContentProject {
   audience: string;
   status: JapanVipContentStatus;
   sources: JapanVipSource[];
+  selectedReferenceIds: string[];
   facts: string[];
   outline: string;
   article: string;
   notes: string;
+  feedback: Array<{
+    id: string;
+    category: string;
+    note: string;
+    savedAsRule: boolean;
+    createdAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -2951,6 +2959,7 @@ export const updateJapanVipContentProject = (
       | "audience"
       | "status"
       | "facts"
+      | "selectedReferenceIds"
       | "outline"
       | "article"
       | "notes"
@@ -2987,6 +2996,83 @@ export const generateJapanVipArticle = (id: string) =>
   post<JapanVipContentProject>(
     `/api/japanvip-content/${encodeURIComponent(id)}/generate-article`
   );
+
+export interface JapanVipStyleAnalysis {
+  summary: string;
+  structure: string[];
+  openingPatterns: string[];
+  persuasionPatterns: string[];
+  seoPatterns: string[];
+  strengths: string[];
+  weaknesses: string[];
+  reusableLessons: string[];
+  avoidCopying: string[];
+}
+
+export type JapanVipReferenceKind = "competitor" | "inspiration" | "japanvip";
+
+export interface JapanVipReferenceArticle {
+  id: string;
+  kind: JapanVipReferenceKind;
+  url: string;
+  canonicalUrl: string | null;
+  title: string;
+  siteName: string | null;
+  tags: string[];
+  text: string;
+  analysis: JapanVipStyleAnalysis;
+  active: boolean;
+  fetchedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JapanVipLearningRule {
+  id: string;
+  text: string;
+  source: "manual" | "feedback";
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JapanVipLearningLibrary {
+  version: 1;
+  articles: JapanVipReferenceArticle[];
+  rules: JapanVipLearningRule[];
+  updatedAt: string;
+}
+
+export const getJapanVipLearningLibrary = () =>
+  request<JapanVipLearningLibrary>("/api/japanvip-learning");
+
+export const addJapanVipReferenceArticle = (input: {
+  url: string;
+  kind: JapanVipReferenceKind;
+  tags?: string[];
+}) => post<JapanVipLearningLibrary>("/api/japanvip-learning/articles", input);
+
+export const updateJapanVipReferenceArticle = (
+  id: string,
+  patch: Partial<Pick<JapanVipReferenceArticle, "active" | "kind" | "tags">>
+) => jsonBody<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}`, "PATCH", patch);
+
+export const deleteJapanVipReferenceArticle = (id: string) =>
+  request<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const addJapanVipLearningRule = (text: string) =>
+  post<JapanVipLearningLibrary>("/api/japanvip-learning/rules", { text });
+
+export const updateJapanVipLearningRule = (id: string, patch: { active?: boolean; text?: string }) =>
+  jsonBody<JapanVipLearningLibrary>(`/api/japanvip-learning/rules/${encodeURIComponent(id)}`, "PATCH", patch);
+
+export const deleteJapanVipLearningRule = (id: string) =>
+  request<JapanVipLearningLibrary>(`/api/japanvip-learning/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const addJapanVipContentFeedback = (
+  id: string,
+  input: { category: string; note: string; saveAsRule: boolean }
+) => post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/feedback`, input);
 
 export const getTtsModels = () => request<TtsModel[]>("/api/tts/models");
 

@@ -22,6 +22,14 @@ export interface JapanVipSource {
   fetchedAt: string;
 }
 
+export interface JapanVipContentFeedback {
+  id: string;
+  category: string;
+  note: string;
+  savedAsRule: boolean;
+  createdAt: string;
+}
+
 export interface JapanVipContentProject {
   id: string;
   name: string;
@@ -31,12 +39,22 @@ export interface JapanVipContentProject {
   audience: string;
   status: JapanVipContentStatus;
   sources: JapanVipSource[];
+  selectedReferenceIds: string[];
   facts: string[];
   outline: string;
   article: string;
   notes: string;
+  feedback: JapanVipContentFeedback[];
   createdAt: string;
   updatedAt: string;
+}
+
+function normalizeProject(project: JapanVipContentProject): JapanVipContentProject {
+  return {
+    ...project,
+    selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
+    feedback: Array.isArray(project.feedback) ? project.feedback : [],
+  };
 }
 
 function dirOf(id: string): string {
@@ -57,7 +75,7 @@ export function listJapanVipContent(): JapanVipContentProject[] {
   for (const entry of fs.readdirSync(paths.japanVipContentDir, { withFileTypes: true })) {
     if (!entry.isDirectory() || !isValidId(entry.name)) continue;
     try {
-      out.push(JSON.parse(fs.readFileSync(fileOf(entry.name), "utf8")) as JapanVipContentProject);
+      out.push(normalizeProject(JSON.parse(fs.readFileSync(fileOf(entry.name), "utf8")) as JapanVipContentProject));
     } catch {
       // Một project hỏng không được làm mất toàn bộ danh sách.
     }
@@ -70,7 +88,7 @@ export function readJapanVipContent(id: string): JapanVipContentProject {
     throw new HttpError(404, "JAPANVIP_CONTENT_NOT_FOUND", `Không tìm thấy Content Project "${id}"`);
   }
   try {
-    return JSON.parse(fs.readFileSync(fileOf(id), "utf8")) as JapanVipContentProject;
+    return normalizeProject(JSON.parse(fs.readFileSync(fileOf(id), "utf8")) as JapanVipContentProject);
   } catch {
     throw new HttpError(500, "JAPANVIP_CONTENT_CORRUPT", `Dữ liệu Content Project "${id}" bị hỏng`);
   }
@@ -105,10 +123,12 @@ export function createJapanVipContent(input: {
     audience: "Khách hàng Việt Nam quan tâm sản phẩm Nhật Bản cao cấp",
     status: "draft",
     sources: [],
+    selectedReferenceIds: [],
     facts: [],
     outline: "",
     article: "",
     notes: "",
+    feedback: [],
     createdAt: now,
     updatedAt: now,
   };

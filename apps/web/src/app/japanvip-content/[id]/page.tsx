@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ExternalLink, FileCheck2, Plus, Save, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Brain, ExternalLink, FileCheck2, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,13 +13,16 @@ import { IconButton } from "@/components/IconButton";
 import { PageHeader } from "@/components/PageHeader";
 import {
   addJapanVipContentSource,
+  addJapanVipContentFeedback,
   deleteJapanVipContentSource,
   generateJapanVipArticle,
   generateJapanVipOutline,
   getJapanVipContentProject,
+  getJapanVipLearningLibrary,
   updateJapanVipContentProject,
   type JapanVipContentProject,
   type JapanVipContentStatus,
+  type JapanVipLearningLibrary,
 } from "@/lib/api";
 
 const STATUS: Record<JapanVipContentStatus, { label: string; tone: BadgeTone }> = {
@@ -36,14 +39,19 @@ export default function JapanVipContentDetailPage() {
   const [project, setProject] = useState<JapanVipContentProject | null>(null);
   const [draft, setDraft] = useState<JapanVipContentProject | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [learning, setLearning] = useState<JapanVipLearningLibrary | null>(null);
+  const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [saveAsRule, setSaveAsRule] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const next = await getJapanVipContentProject(id);
+      const [next, nextLearning] = await Promise.all([getJapanVipContentProject(id), getJapanVipLearningLibrary()]);
       setProject(next);
       setDraft(next);
+      setLearning(nextLearning);
       if (next.sources.length === 0 && next.primaryUrl) setSourceUrl(next.primaryUrl);
       setError(null);
     } catch (e) {
@@ -84,6 +92,7 @@ export default function JapanVipContentDetailPage() {
         audience: draft.audience,
         status: draft.status,
         facts: draft.facts,
+        selectedReferenceIds: draft.selectedReferenceIds,
         outline: draft.outline,
         article: draft.article,
         notes: draft.notes,
@@ -169,6 +178,39 @@ export default function JapanVipContentDetailPage() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
+          <Card
+            title="AI học từ bài tham khảo"
+            actions={<Link href="/japanvip-content/learning" className="btn btn-secondary btn-sm"><Brain size={14} /> Quản lý thư viện</Link>}
+          >
+            <p className="mb-3 text-sm text-[var(--text-muted)]">
+              Chọn bài để AI học bố cục và kỹ thuật viết. Dữ kiện sản phẩm vẫn chỉ lấy từ nguồn chính thức và fact sheet.
+            </p>
+            <div className="flex flex-col gap-2">
+              {learning?.articles.filter((article) => article.active).map((article) => {
+                const checked = draft.selectedReferenceIds.includes(article.id);
+                return (
+                  <label key={article.id} className="flex cursor-pointer items-start gap-3 rounded-[var(--radius)] border border-[var(--border)] p-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-[var(--primary)]"
+                      checked={checked}
+                      onChange={(e) => patch("selectedReferenceIds", e.target.checked
+                        ? [...draft.selectedReferenceIds, article.id]
+                        : draft.selectedReferenceIds.filter((value) => value !== article.id))}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{article.title}</span>
+                      <span className="mt-1 block text-xs text-[var(--text-muted)]">{article.analysis.summary || article.siteName || "Bài tham khảo"}</span>
+                    </span>
+                  </label>
+                );
+              })}
+              {(!learning || learning.articles.filter((article) => article.active).length === 0) && (
+                <p className="py-5 text-center text-sm text-[var(--text-muted)]">Chưa có bài mẫu. Mở thư viện để dán link bài đối thủ hoặc bài cần học.</p>
+              )}
+            </div>
+          </Card>
+
           <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : "AI tạo dàn ý"}</Button>}>
             <textarea className="input min-h-72 resize-y font-mono text-sm" value={draft.outline} onChange={(e) => patch("outline", e.target.value)} placeholder="## Tổng quan sản phẩm…" />
           </Card>
@@ -182,6 +224,42 @@ export default function JapanVipContentDetailPage() {
               <textarea id="jvc-notes" className="input min-h-28 resize-y" value={draft.notes} onChange={(e) => patch("notes", e.target.value)} placeholder="Điểm cần sửa, claim cần kiểm chứng, yêu cầu bổ sung ảnh…" />
             </Field>
             <p className="mt-3 text-meta text-[var(--text-muted)]">MVP chưa có chức năng xuất bản lên japanvip.vn. Nội dung phải được duyệt trước khi tích hợp CMS.</p>
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <p className="mb-2 text-sm font-semibold">Dạy AI từ lần chỉnh sửa này</p>
+              <div className="grid gap-2 sm:grid-cols-[220px_minmax(0,1fr)]">
+                <select className="input" value={feedbackCategory} onChange={(e) => setFeedbackCategory(e.target.value)}>
+                  <option>Giọng văn chưa đúng</option>
+                  <option>Mở bài chưa hấp dẫn</option>
+                  <option>Quá giống văn AI</option>
+                  <option>Thiếu tư vấn mua hàng</option>
+                  <option>Thông tin chưa đủ nguồn</option>
+                  <option>Quá dài hoặc quá ngắn</option>
+                  <option>Điểm làm tốt cần giữ</option>
+                  <option>Khác</option>
+                </select>
+                <textarea className="input min-h-24 resize-y" value={feedbackNote} onChange={(e) => setFeedbackNote(e.target.value)} placeholder="Nói rõ AI cần giữ điều gì hoặc tránh điều gì ở những bài sau…" />
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={saveAsRule} onChange={(e) => setSaveAsRule(e.target.checked)} />
+                Áp dụng phản hồi này như quy tắc cho các bài sau
+              </label>
+              <Button className="mt-3" small variant="secondary" disabled={!feedbackNote.trim() || busy !== null} onClick={() => void run("feedback", async () => {
+                const next = await addJapanVipContentFeedback(id, { category: feedbackCategory, note: feedbackNote.trim(), saveAsRule });
+                setFeedbackNote("");
+                if (saveAsRule) setLearning(await getJapanVipLearningLibrary());
+                return next;
+              })}><Brain size={14} /> {busy === "feedback" ? "Đang ghi nhớ…" : "Lưu bài học cho AI"}</Button>
+              {draft.feedback.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {draft.feedback.slice(0, 5).map((item) => (
+                    <div key={item.id} className="rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm">
+                      <span className="font-medium">{item.category}:</span> {item.note}
+                      {item.savedAsRule && <span className="ml-2 text-xs text-[var(--primary)]">Đã lưu vào bộ nhớ chung</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
       </div>

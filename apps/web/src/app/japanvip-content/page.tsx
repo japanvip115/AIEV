@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { Brain, FileText, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -97,9 +98,10 @@ export default function JapanVipContentPage() {
         title="Japan VIP Content"
         subtitle="Nghiên cứu nguồn chính thức, lập fact sheet, viết bài SEO và duyệt trước khi xuất bản."
         actions={
-          <Button onClick={() => setOpen(true)}>
-            <Plus size={16} /> Tạo Content Project
-          </Button>
+          <>
+            <Link href="/japanvip-content/learning" className="btn btn-secondary"><Brain size={16} /> AI học nội dung</Link>
+            <Button onClick={() => setOpen(true)}><Plus size={16} /> Tạo Content Project</Button>
+          </>
         }
       />
       {error && <ErrorBanner message="Không tải được Content Project" detail={error} />}

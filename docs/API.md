@@ -1188,6 +1188,7 @@ POST   /api/japanvip-content/:id/sources             { url }
 DELETE /api/japanvip-content/:id/sources/:sourceId
 POST   /api/japanvip-content/:id/generate-outline
 POST   /api/japanvip-content/:id/generate-article
+POST   /api/japanvip-content/:id/feedback            { category, note, saveAsRule }
 ```
 
 - Nguồn URL đi qua cùng lớp `safeFetchHtml` và Readability của Text to video.
@@ -1195,6 +1196,25 @@ POST   /api/japanvip-content/:id/generate-article
 - AI tạo dàn ý và bài Markdown bằng một lượt Claude không có tool; claim thiếu bằng chứng phải giữ
   nhãn `[CẦN KIỂM CHỨNG]`.
 - MVP không có endpoint xuất bản CMS. Trạng thái `approved` chỉ ghi nhận đã duyệt nội bộ.
+
+### Thư viện AI học nội dung
+
+```text
+GET    /api/japanvip-learning
+POST   /api/japanvip-learning/articles               { url, kind, tags? }
+PATCH  /api/japanvip-learning/articles/:articleId
+DELETE /api/japanvip-learning/articles/:articleId
+POST   /api/japanvip-learning/rules                  { text }
+PATCH  /api/japanvip-learning/rules/:ruleId
+DELETE /api/japanvip-learning/rules/:ruleId
+```
+
+- `kind`: `competitor`, `inspiration` hoặc `japanvip`.
+- AI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận
+  claim sản phẩm và không được sao chép câu chữ.
+- Project chọn bài mẫu qua `selectedReferenceIds`. Dữ kiện sản phẩm vẫn chỉ lấy từ nguồn chính thức
+  và fact sheet đã duyệt.
+- Phản hồi có `saveAsRule=true` được đưa vào bộ quy tắc dùng chung cho những lần viết sau.
 
 ## Update (cập nhật hệ thống từ GitHub — badge cuối sidebar)
 
