@@ -31,6 +31,28 @@ export interface JapanVipContentFeedback {
   createdAt: string;
 }
 
+export interface JapanVipHermesCriterion {
+  key: string;
+  label: string;
+  score: number;
+  maxScore: number;
+  feedback: string;
+}
+
+export interface JapanVipHermesReview {
+  id: string;
+  round: number;
+  totalScore: number;
+  verdict: "needs_work" | "good" | "excellent";
+  summary: string;
+  strengths: string[];
+  issues: string[];
+  revisionInstructions: string[];
+  suggestedRules: string[];
+  criteria: JapanVipHermesCriterion[];
+  createdAt: string;
+}
+
 export interface JapanVipContentProject {
   id: string;
   name: string;
@@ -47,6 +69,7 @@ export interface JapanVipContentProject {
   article: string;
   notes: string;
   feedback: JapanVipContentFeedback[];
+  hermesReviews: JapanVipHermesReview[];
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +80,7 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
     aiProvider: project.aiProvider === "claude" || project.aiProvider === "ollama" ? project.aiProvider : "codex",
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
     feedback: Array.isArray(project.feedback) ? project.feedback : [],
+    hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
   };
 }
 
@@ -133,6 +157,7 @@ export function createJapanVipContent(input: {
     article: "",
     notes: "",
     feedback: [],
+    hermesReviews: [],
     createdAt: now,
     updatedAt: now,
   };

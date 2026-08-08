@@ -1219,6 +1219,12 @@ DELETE /api/japanvip-learning/rules/:ruleId
   cung cấp đã chọn. Endpoint thêm bài mẫu nhận `aiProvider` riêng cho lượt phân tích đó.
 - Ollama dùng `OLLAMA_URL` (mặc định `http://127.0.0.1:11434`) và `OLLAMA_TEXT_MODEL`
   (mặc định `qwen3:14b`). `GET /api/japanvip-learning/ai-status` trả trạng thái service/model.
+- `POST /api/japanvip-content/:id/hermes-review` dùng Hermes làm giám khảo độc lập, lưu bảng điểm
+  7 tiêu chí và đề xuất sửa vào `hermesReviews`. `POST /api/japanvip-content/:id/revise-from-hermes`
+  giao bản sửa cho AI đang được project chọn; người dùng có thể gọi Hermes chấm lại sau đó.
+- Hermes critic mặc định dùng Nous Portal với `tencent/hy3:free`; có thể đổi bằng
+  `HERMES_CRITIC_PROVIDER` và `HERMES_CRITIC_MODEL`. Quy tắc Hermes đề xuất không được tự lưu:
+  chỉ phản hồi có `saveAsRule=true` sau thao tác duyệt của người dùng mới vào bộ nhớ chung.
 
 ## Update (cập nhật hệ thống từ GitHub — badge cuối sidebar)
 

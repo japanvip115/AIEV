@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Brain, ExternalLink, FileCheck2, Plus, Save, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Brain, ExternalLink, FileCheck2, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +17,8 @@ import {
   deleteJapanVipContentSource,
   generateJapanVipArticle,
   generateJapanVipOutline,
+  reviewJapanVipArticleWithHermes,
+  reviseJapanVipArticleFromHermes,
   getJapanVipContentProject,
   getJapanVipLearningLibrary,
   updateJapanVipContentProject,
@@ -248,6 +250,30 @@ export default function JapanVipContentDetailPage() {
 
           <Card title="Bài viết Markdown" actions={<Button small disabled={busy !== null || !draft.outline.trim()} onClick={() => void run("article", () => generateJapanVipArticle(id))}><Sparkles size={14} /> {busy === "article" ? "Đang viết…" : `${AI_LABEL[draft.aiProvider]} viết bài`}</Button>}>
             <textarea className="input min-h-[560px] resize-y font-mono text-sm leading-6" value={draft.article} onChange={(e) => patch("article", e.target.value)} placeholder="Bài viết hoàn chỉnh sẽ xuất hiện tại đây…" />
+          </Card>
+
+          <Card title="Hermes chấm điểm & phản biện" actions={<Button small disabled={busy !== null || !draft.article.trim()} onClick={() => void run("hermes-review", () => reviewJapanVipArticleWithHermes(id))}><ShieldCheck size={14} /> {busy === "hermes-review" ? "Hermes đang chấm…" : draft.hermesReviews.length ? "Hermes chấm lại" : "Hermes chấm bài"}</Button>}>
+            {draft.hermesReviews.length === 0 ? (
+              <p className="py-6 text-center text-sm text-[var(--text-muted)]">Sau khi viết bài, dùng Hermes làm giám khảo độc lập. Nhận xét chưa tự động trở thành quy tắc chung.</p>
+            ) : (() => {
+              const review = draft.hermesReviews[0];
+              return <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border-2 border-[var(--primary)] bg-[var(--surface-subtle)] p-4">
+                  <div className="text-4xl font-bold text-[var(--primary)]">{review.totalScore}<span className="text-base text-[var(--text-muted)]">/100</span></div>
+                  <div><p className="font-semibold">Vòng chấm {review.round}</p><p className="text-sm text-[var(--text-muted)]">{review.summary}</p></div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {review.criteria.map((criterion) => <div key={criterion.key} className="rounded-[var(--radius)] border border-[var(--border)] p-3">
+                    <div className="flex justify-between gap-2 text-sm font-semibold"><span>{criterion.label}</span><span className="text-[var(--primary)]">{criterion.score}/100</span></div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-subtle)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${criterion.score}%` }} /></div>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{criterion.feedback}</p>
+                  </div>)}
+                </div>
+                {review.revisionInstructions.length > 0 && <div><p className="mb-2 font-semibold">Việc cần sửa</p><ul className="list-disc space-y-1 pl-5 text-sm">{review.revisionInstructions.map((item) => <li key={item}>{item}</li>)}</ul></div>}
+                <Button small disabled={busy !== null || review.revisionInstructions.length === 0} onClick={() => void run("hermes-revise", () => reviseJapanVipArticleFromHermes(id))}><WandSparkles size={14} /> {busy === "hermes-revise" ? `${AI_LABEL[draft.aiProvider]} đang sửa…` : `${AI_LABEL[draft.aiProvider]} sửa theo phản biện`}</Button>
+                {review.suggestedRules.length > 0 && <div className="border-t border-[var(--border)] pt-4"><p className="font-semibold">Quy tắc Hermes đề xuất — chỉ lưu khi bạn duyệt</p><div className="mt-2 flex flex-col gap-2">{review.suggestedRules.map((rule) => <div key={rule} className="flex items-start justify-between gap-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm"><span>{rule}</span><Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`hermes-rule-${rule}`, async () => { const next = await addJapanVipContentFeedback(id, { category: "Hermes đề xuất", note: rule, saveAsRule: true }); setLearning(await getJapanVipLearningLibrary()); return next; })}>Duyệt & lưu</Button></div>)}</div></div>}
+              </div>;
+            })()}
           </Card>
 
           <Card title="Duyệt nội dung" actions={draft.status !== "approved" ? <Button small variant="secondary" disabled={busy !== null || !draft.article.trim()} onClick={() => void run("approve", () => updateJapanVipContentProject(id, { status: "approved" }))}><FileCheck2 size={14} /> {busy === "approve" ? "Đang lưu…" : "Đánh dấu đã duyệt"}</Button> : undefined}>

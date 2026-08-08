@@ -2934,6 +2934,19 @@ export interface JapanVipContentProject {
     savedAsRule: boolean;
     createdAt: string;
   }>;
+  hermesReviews: Array<{
+    id: string;
+    round: number;
+    totalScore: number;
+    verdict: "needs_work" | "good" | "excellent";
+    summary: string;
+    strengths: string[];
+    issues: string[];
+    revisionInstructions: string[];
+    suggestedRules: string[];
+    criteria: Array<{ key: string; label: string; score: number; maxScore: number; feedback: string }>;
+    createdAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -3000,6 +3013,12 @@ export const generateJapanVipArticle = (id: string) =>
   post<JapanVipContentProject>(
     `/api/japanvip-content/${encodeURIComponent(id)}/generate-article`
   );
+
+export const reviewJapanVipArticleWithHermes = (id: string) =>
+  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/hermes-review`);
+
+export const reviseJapanVipArticleFromHermes = (id: string) =>
+  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/revise-from-hermes`);
 
 export interface JapanVipStyleAnalysis {
   summary: string;

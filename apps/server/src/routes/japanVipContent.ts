@@ -14,6 +14,7 @@ import {
 } from "../japanVipContent.js";
 import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary } from "../japanVipLearning.js";
+import { askHermesCritic } from "../hermesCritic.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -23,6 +24,58 @@ const STATUSES = new Set<JapanVipContentStatus>([
   "review",
   "approved",
 ]);
+
+function textList(value: unknown, limit = 12): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, limit) : [];
+}
+
+async function runHermesReview(project: JapanVipContentProject) {
+  if (!project.article.trim()) throw new HttpError(400, "NO_ARTICLE", "Cần viết bài trước khi Hermes chấm điểm");
+  const approvedRules = readJapanVipLearningLibrary().rules.filter((rule) => rule.active).map((rule) => `- ${rule.text}`).join("\n");
+  const prompt = [
+    "Bạn là Hermes, giám khảo biên tập độc lập cho nội dung sản phẩm cao cấp của japanvip.vn.",
+    "Không dùng công cụ, không bổ sung dữ kiện mới và không phê duyệt xuất bản.",
+    "Chấm đúng 7 tiêu chí, mỗi tiêu chí tối đa 100 rồi tính totalScore là trung bình làm tròn.",
+    "Tiêu chí: factual (chính xác và bám nguồn), structure (cấu trúc), naturalness (tiếng Việt tự nhiên), seo (ý định tìm kiếm), evidence (bằng chứng và giới hạn), originality (không lặp/không giống AI), conversion (tư vấn mua hàng).",
+    "Phân biệt lỗi riêng của bài với quy tắc có thể tái sử dụng. suggestedRules chỉ là đề xuất, chưa được tự lưu.",
+    "Trả JSON thuần theo schema: {\"totalScore\":0,\"verdict\":\"needs_work|good|excellent\",\"summary\":\"\",\"strengths\":[\"\"],\"issues\":[\"\"],\"revisionInstructions\":[\"\"],\"suggestedRules\":[\"\"],\"criteria\":[{\"key\":\"factual\",\"label\":\"Độ chính xác\",\"score\":0,\"maxScore\":100,\"feedback\":\"\"}] }.",
+    `QUY TẮC ĐÃ ĐƯỢC CHỦ SỞ HỮU DUYỆT:\n${approvedRules || "Chưa có"}`,
+    researchContext(project),
+    `BÀI VIẾT CẦN CHẤM:\n${project.article.slice(0, 80_000)}`,
+  ].join("\n\n");
+  const raw = await askHermesCritic(prompt);
+  const parsed = extractJson<Record<string, unknown>>(raw);
+  if (!parsed || !Array.isArray(parsed.criteria)) throw new HttpError(502, "HERMES_REVIEW_PARSE_FAILED", "Hermes không trả về bảng chấm điểm hợp lệ");
+  const criteria = parsed.criteria.slice(0, 7).map((item) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    return {
+      key: typeof row.key === "string" ? row.key.slice(0, 40) : "other",
+      label: typeof row.label === "string" ? row.label.slice(0, 80) : "Tiêu chí",
+      score: Math.max(0, Math.min(100, Math.round(Number(row.score) || 0))),
+      maxScore: 100,
+      feedback: typeof row.feedback === "string" ? row.feedback.trim().slice(0, 1_000) : "",
+    };
+  });
+  const calculated = criteria.length ? Math.round(criteria.reduce((sum, item) => sum + item.score, 0) / criteria.length) : 0;
+  const review = {
+    id: nanoid(10),
+    round: (project.hermesReviews[0]?.round ?? 0) + 1,
+    totalScore: calculated,
+    verdict: (calculated >= 90 ? "excellent" : calculated >= 75 ? "good" : "needs_work") as "excellent" | "good" | "needs_work",
+    summary: typeof parsed.summary === "string" ? parsed.summary.trim().slice(0, 2_000) : "",
+    strengths: textList(parsed.strengths),
+    issues: textList(parsed.issues),
+    revisionInstructions: textList(parsed.revisionInstructions),
+    suggestedRules: textList(parsed.suggestedRules, 8),
+    criteria,
+    createdAt: nowIso(),
+  };
+  project.hermesReviews.unshift(review);
+  project.hermesReviews = project.hermesReviews.slice(0, 12);
+  project.status = "review";
+  writeJapanVipContent(project);
+  return project;
+}
 
 function researchContext(project: JapanVipContentProject): string {
   const sources = project.sources
@@ -220,6 +273,34 @@ router.post("/:id/generate-article", async (req, res) => {
       `AI đã lặp lại một câu dài từ bài tham khảo (\"${copiedExcerpt}…\"). Hãy tạo lại bài để bảo đảm nội dung nguyên bản.`,
     );
   }
+  project.article = article;
+  project.status = "review";
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
+router.post("/:id/hermes-review", async (req, res) => {
+  res.json(await runHermesReview(readJapanVipContent(req.params.id)));
+});
+
+router.post("/:id/revise-from-hermes", async (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const review = project.hermesReviews[0];
+  if (!review) throw new HttpError(400, "NO_HERMES_REVIEW", "Cần để Hermes phản biện trước khi sửa bài");
+  const prompt = [
+    "Bạn là biên tập viên senior của japanvip.vn. Hãy sửa bài theo phản biện Hermes bên dưới.",
+    "Giữ nguyên mọi dữ kiện đúng; không bổ sung claim, giá, bảo hành, chứng nhận hoặc trải nghiệm chưa có trong nguồn chính thức/fact sheet.",
+    "Không sao chép bài tham khảo. Xuất Markdown thuần, không giải thích và không bọc code fence.",
+    `PHẢN BIỆN HERMES:\n${review.revisionInstructions.map((item) => `- ${item}`).join("\n")}`,
+    japanVipLearningContext(project.selectedReferenceIds),
+    researchContext(project),
+    `BÀI HIỆN TẠI:\n${project.article}`,
+  ].join("\n\n");
+  const ai = await generateJapanVipText(project.aiProvider, { prompt, usageTag: "japanvip-hermes-revision", projectId: project.id, timeoutMs: 5 * 60_000 });
+  const article = ai.text.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/```$/, "").trim();
+  if (article.length < 300) throw new HttpError(502, "ARTICLE_TOO_SHORT", "Bản sửa AI trả về quá ngắn");
+  const copiedExcerpt = findCopiedReferenceExcerpt(article, project.selectedReferenceIds);
+  if (copiedExcerpt) throw new HttpError(502, "ARTICLE_TOO_SIMILAR", "Bản sửa lặp lại câu dài từ bài tham khảo");
   project.article = article;
   project.status = "review";
   writeJapanVipContent(project);
