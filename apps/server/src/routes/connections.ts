@@ -95,15 +95,15 @@ function listConnections(): ConnectionInfo[] {
     },
     {
       id: "openai",
-      label: "OpenAI (ChatGPT)",
-      roles: [],
-      connected: !!openaiKey,
-      source: openaiKey ? "api-key" : null,
+      label: "OpenAI / Codex CLI",
+      roles: ["image"],
+      connected: !!openaiKey || codexDetected(),
+      source: openaiKey ? "api-key" : codexDetected() ? "oauth" : null,
       note: openaiKey
-        ? "Đã kết nối bằng API key. Hiện pipeline chưa dùng OpenAI - key sẵn sàng cho tính năng tương lai (tạo ảnh GPT-Image, edit bằng Codex)."
+        ? "Đã kết nối bằng API key. Images Project có thể dùng GPT Image 2 qua Codex CLI khi Codex đã đăng nhập ChatGPT."
         : codexDetected()
-          ? "Đã phát hiện đăng nhập ChatGPT qua Codex CLI - nhưng OpenAI khóa subscription này vào sản phẩm Codex, không gọi được API (tạo ảnh...). Muốn dùng OpenAI trong hệ thống cần API key."
-          : "Chưa kết nối. Hiện pipeline chưa dùng OpenAI - có thể lưu sẵn API key cho tính năng tương lai.",
+          ? "Đã phát hiện Codex CLI đăng nhập ChatGPT - sẵn sàng tạo ảnh GPT Image 2 không dùng API key."
+          : "Chưa phát hiện Codex CLI đăng nhập ChatGPT. Chạy codex login để dùng GPT Image 2 không cần API key.",
       key: {
         envVar: "OPENAI_API_KEY",
         present: !!openaiKey,
@@ -254,9 +254,8 @@ router.post("/:provider/test", async (req, res) => {
     if (!key) {
       if (codexDetected()) {
         res.json({
-          ok: false,
-          message:
-            "Chưa có OPENAI_API_KEY. Đăng nhập ChatGPT của Codex CLI có trên máy nhưng không gọi được API bằng nó.",
+          ok: true,
+          message: "Codex CLI đã đăng nhập ChatGPT - sẵn sàng tạo ảnh GPT Image 2 không dùng API key.",
         });
       } else {
         res.json({ ok: false, message: "Chưa có OPENAI_API_KEY." });

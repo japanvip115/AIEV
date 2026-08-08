@@ -268,6 +268,10 @@ class RenderQueue {
             cwd,
             windowsHide: true,
             env: childEnv(),
+            // Tất cả lệnh trong queue đều chạy không tương tác. Nếu để stdin
+            // mặc định là pipe nhưng không đóng, Codex CLI sẽ chờ vô hạn ở
+            // "Reading additional input from stdin..." trước khi xử lý prompt.
+            stdio: ["ignore", "pipe", "pipe"],
           });
           current.child = child;
 

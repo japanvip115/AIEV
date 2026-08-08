@@ -14,10 +14,13 @@ import { ensureDir } from "./util.js";
 
 /** Các model tạo ảnh khả dụng - UI cho chọn, meta.model lưu lựa chọn */
 export const IMAGE_MODELS = [
+  { id: "codex-cli-gpt-image-2", label: "GPT Image 2 (Codex CLI · ChatGPT, không API key)" },
   { id: "gemini-3.1-flash-image", label: "Nano Banana 2 (khuyên dùng) - gemini-3.1-flash-image" },
   { id: "gemini-3.1-flash-lite-image", label: "Nano Banana 2 Lite (rẻ, nhanh) - gemini-3.1-flash-lite-image" },
   { id: "gemini-3-pro-image", label: "Nano Banana Pro (cao cấp, 4K) - gemini-3-pro-image" },
 ] as const;
+
+export const CODEX_CLI_IMAGE_MODEL = "codex-cli-gpt-image-2";
 
 export const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
 

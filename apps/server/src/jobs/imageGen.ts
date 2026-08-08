@@ -2,7 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { paths, repoRoot } from "../config.js";
 import { updateJob } from "../db.js";
-import { geminiApiKey, generateBackground } from "../gemini.js";
+import { generateBackgroundWithCodexCli } from "../codexImage.js";
+import {
+  CODEX_CLI_IMAGE_MODEL,
+  geminiApiKey,
+  generateBackground,
+  buildImagePrompt,
+} from "../gemini.js";
 import {
   IMAGE_GEN_STEPS,
   imageDirOf,
@@ -62,26 +68,41 @@ export async function runImageGen(ctx: JobCtx): Promise<void> {
 // ---- step background: Gemini tạo ảnh nền -------------------------------
 
 async function stepBackground(ctx: JobCtx, id: string): Promise<void> {
-  if (!geminiApiKey()) {
+  const meta = readImageMeta(id);
+  const useCodexCli = meta.model === CODEX_CLI_IMAGE_MODEL;
+  if (!useCodexCli && !geminiApiKey()) {
     throw new Error(
       "Chưa có GEMINI_API_KEY. Thêm GEMINI_API_KEY vào .env - lấy tại aistudio.google.com/apikey; hoặc tự upload nền rồi chạy bước Hoàn thiện.",
     );
   }
-  const meta = readImageMeta(id);
   const design = getStyle(meta.styleId); // style đã chọn hoặc default
 
-  ctx.progress(5, "Gemini tạo ảnh nền");
-  ctx.log(`[gemini] kind=${meta.kind} aspect=${meta.aspect}`);
-  const { promptUsed } = await generateBackground({
-    prompt: meta.prompt,
-    kind: meta.kind,
-    aspect: meta.aspect,
-    design,
-    outFile: path.join(imageDirOf(id), "background.png"),
-    usageProjectId: id,
-    model: meta.model ?? undefined,
-  });
-  ctx.log(`[gemini] prompt: ${promptUsed}`);
+  const outFile = path.join(imageDirOf(id), "background.png");
+  if (useCodexCli) {
+    ctx.progress(5, "GPT Image 2 tạo ảnh qua Codex CLI");
+    const promptUsed = buildImagePrompt({
+      prompt: meta.prompt,
+      kind: meta.kind,
+      aspect: meta.aspect,
+      design,
+    });
+    ctx.log(`[codex-image] kind=${meta.kind} aspect=${meta.aspect}`);
+    await generateBackgroundWithCodexCli({ ctx, prompt: promptUsed, aspect: meta.aspect, outFile });
+    ctx.log(`[codex-image] prompt: ${promptUsed}`);
+  } else {
+    ctx.progress(5, "Gemini tạo ảnh nền");
+    ctx.log(`[gemini] kind=${meta.kind} aspect=${meta.aspect}`);
+    const { promptUsed } = await generateBackground({
+      prompt: meta.prompt,
+      kind: meta.kind,
+      aspect: meta.aspect,
+      design,
+      outFile,
+      usageProjectId: id,
+      model: meta.model ?? undefined,
+    });
+    ctx.log(`[gemini] prompt: ${promptUsed}`);
+  }
 
   const fresh = readImageMeta(id);
   fresh.background = "background.png";

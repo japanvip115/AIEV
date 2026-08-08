@@ -70,7 +70,7 @@ export interface ImageProject {
   kind: ImageKind;
   aspect: ImageAspect;
   status: ImageStatus;
-  /** Model Gemini tạo nền (IMAGE_MODELS trong gemini.ts) - null = mặc định Nano Banana 2 */
+  /** Model tạo nền (Gemini hoặc GPT Image 2 qua Codex CLI) - null = mặc định Nano Banana 2 */
   model: string | null;
   /** Style Design áp dụng khi generate (id trong assets/styles/styles.json) - null = style default */
   styleId: string | null;

@@ -85,8 +85,10 @@ async function fetchLiveImageModels(): Promise<{
         label: staticLabels.get(id) ?? id,
       }));
     if (list.length > 0) {
-      liveImageModelsCache = { at: Date.now(), list };
-      return { source: "google", models: list };
+      const cliModel = GEMINI_MODELS.find((m) => m.id === "codex-cli-gpt-image-2");
+      const combined = cliModel ? [cliModel, ...list] : list;
+      liveImageModelsCache = { at: Date.now(), list: combined };
+      return { source: "google", models: combined };
     }
     return { source: "static", models: GEMINI_MODELS };
   } catch {

@@ -437,6 +437,9 @@ export default function ImageProjectDetailPage() {
 
   // Select model gọn ở cột thiết lập - live list, fallback danh sách tĩnh
   const currentModel = draft?.model ?? proj?.model ?? null;
+  const codexCliSelected = currentModel === "codex-cli-gpt-image-2";
+  const imageProviderReady = geminiConnected || codexCliSelected;
+  const imageProviderTooltip = imageProviderReady ? undefined : geminiTooltip;
   const modelOptions = liveModels ?? gemini?.models ?? [];
   const modelMissing =
     currentModel !== null && !modelOptions.some((m) => m.id === currentModel);
@@ -578,10 +581,10 @@ export default function ImageProjectDetailPage() {
               )}
 
               {/* Hành động chính - full-width, một chạm */}
-              <span title={geminiTooltip} className="block">
+              <span title={imageProviderTooltip} className="block">
                 <Button
                   className="w-full"
-                  disabled={genSubmitting || generating || !geminiConnected}
+                  disabled={genSubmitting || generating || !imageProviderReady}
                   onClick={() => runGenerate("all")}
                 >
                   <Zap size={15} strokeWidth={2} />
@@ -623,16 +626,16 @@ export default function ImageProjectDetailPage() {
 
               {/* Chạy từng bước riêng lẻ */}
               <div className="grid grid-cols-2 gap-2">
-                <span title={geminiTooltip} className="min-w-0">
+                <span title={imageProviderTooltip} className="min-w-0">
                   <Button
                     variant="secondary"
                     small
                     className="w-full"
-                    disabled={genSubmitting || generating || !geminiConnected}
+                    disabled={genSubmitting || generating || !imageProviderReady}
                     onClick={() => runGenerate("background")}
                   >
                     <Wand2 size={14} strokeWidth={2} />
-                    {t("imageDetail.gen-bg")}
+                    {codexCliSelected ? "Tạo nền (GPT Image 2)" : t("imageDetail.gen-bg")}
                   </Button>
                 </span>
                 <span
@@ -651,7 +654,7 @@ export default function ImageProjectDetailPage() {
                   </Button>
                 </span>
               </div>
-              {!geminiConnected && gemini && (
+              {!imageProviderReady && gemini && (
                 <p className="text-meta text-[var(--text-muted)]">
                   {t("imageDetail.gemini-hint")}
                 </p>
