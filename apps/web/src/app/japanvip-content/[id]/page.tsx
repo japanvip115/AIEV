@@ -162,6 +162,20 @@ export default function JapanVipContentDetailPage() {
           </nav>
           <div className="flex items-center gap-2">
             {dirty && <span className="hidden text-xs font-medium text-amber-600 sm:inline">Có thay đổi chưa lưu</span>}
+            <label className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 shadow-sm">
+              <span className="hidden items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-[var(--text-muted)] lg:flex"><Sparkles size={13} className="text-[var(--primary)]" /> AI thực thi</span>
+              <select
+                aria-label="AI thực thi nhanh"
+                className="min-w-[150px] border-0 bg-transparent text-sm font-semibold outline-none sm:min-w-[190px]"
+                value={draft.aiProvider}
+                disabled={busy !== null}
+                onChange={(e) => void chooseProvider(e.target.value as JapanVipAiProvider)}
+              >
+                <option value="codex">ChatGPT (Codex CLI)</option>
+                <option value="claude">Claude Code</option>
+                <option value="ollama">Ollama Local (qwen3:14b)</option>
+              </select>
+            </label>
             <Button disabled={!dirty || busy !== null} onClick={() => void save()}><Save size={15} /> {busy === "save" ? "Đang lưu…" : "Lưu thay đổi"}</Button>
           </div>
         </div>
