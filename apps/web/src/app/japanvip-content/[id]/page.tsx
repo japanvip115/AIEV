@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Brain, CheckCircle2, Database, ExternalLink, FileCheck2, Images, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
+import { ArrowLeft, Brain, CheckCircle2, ClipboardPaste, Database, ExternalLink, FileCheck2, Images, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,6 +13,7 @@ import { IconButton } from "@/components/IconButton";
 import { PageHeader } from "@/components/PageHeader";
 import {
   addJapanVipContentSource,
+  addJapanVipManualContentSource,
   addJapanVipContentFeedback,
   deleteJapanVipContentSource,
   deleteJapanVipContentImage,
@@ -66,6 +67,8 @@ export default function JapanVipContentDetailPage() {
   const [project, setProject] = useState<JapanVipContentProject | null>(null);
   const [draft, setDraft] = useState<JapanVipContentProject | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [manualSourceTitle, setManualSourceTitle] = useState("");
+  const [manualSourceText, setManualSourceText] = useState("");
   const [imageSourceUrl, setImageSourceUrl] = useState("");
   const [learning, setLearning] = useState<JapanVipLearningLibrary | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
@@ -264,6 +267,17 @@ export default function JapanVipContentDetailPage() {
                 return next;
               })}><Plus size={15} /> {busy === "source" ? "Đang bóc…" : "Thêm"}</Button>
             </div>
+            <details className="mb-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--primary)]">Trang chặn bot hoặc dùng JavaScript? Dán nội dung thủ công</summary>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Mở trang nguồn, sao chép phần nội dung cần dùng rồi dán vào đây. Hệ thống vẫn gắn nội dung với URL nguồn phía trên.</p>
+              <input className="input mt-3" value={manualSourceTitle} onChange={(e) => setManualSourceTitle(e.target.value)} placeholder="Tên nguồn, ví dụ: Zojirushi NW-NC10 – tính năng" />
+              <textarea className="input mt-2 min-h-44 resize-y" value={manualSourceText} onChange={(e) => setManualSourceText(e.target.value)} placeholder="Dán nội dung đã sao chép từ trang hãng (tối thiểu 200 ký tự)…" />
+              <div className="mt-2 flex justify-end"><Button small disabled={!sourceUrl.trim() || manualSourceText.trim().length < 200 || busy !== null} onClick={() => void run("manual-source", async () => {
+                const next = await addJapanVipManualContentSource(id, { url: sourceUrl.trim(), title: manualSourceTitle.trim(), text: manualSourceText.trim() });
+                setSourceUrl(""); setManualSourceTitle(""); setManualSourceText("");
+                return next;
+              })}><ClipboardPaste size={14} /> {busy === "manual-source" ? "Đang lưu…" : "Lưu nội dung làm nguồn"}</Button></div>
+            </details>
             <div className="flex flex-col gap-2">
               {draft.sources.map((source) => (
                 <div key={source.id} className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--border)] p-3">

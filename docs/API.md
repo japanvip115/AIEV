@@ -1185,6 +1185,7 @@ PATCH  /api/japanvip-content/:id
 DELETE /api/japanvip-content/:id
 
 POST   /api/japanvip-content/:id/sources             { url }
+POST   /api/japanvip-content/:id/sources/manual      { url, title?, text }
 DELETE /api/japanvip-content/:id/sources/:sourceId
 POST   /api/japanvip-content/:id/generate-outline
 POST   /api/japanvip-content/:id/generate-article

@@ -3032,6 +3032,12 @@ export const addJapanVipContentSource = (id: string, url: string) =>
     { url }
   );
 
+export const addJapanVipManualContentSource = (id: string, input: { url: string; title?: string; text: string }) =>
+  post<JapanVipContentProject>(
+    `/api/japanvip-content/${encodeURIComponent(id)}/sources/manual`,
+    input
+  );
+
 export const deleteJapanVipContentSource = (id: string, sourceId: string) =>
   request<JapanVipContentProject>(
     `/api/japanvip-content/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}`,

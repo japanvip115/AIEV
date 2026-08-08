@@ -232,6 +232,32 @@ router.post("/:id/sources", async (req, res) => {
   res.status(201).json(project);
 });
 
+router.post("/:id/sources/manual", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (!url) throw new HttpError(400, "INVALID_URL", "Thiếu URL của nguồn được dán thủ công");
+  let hostname = "";
+  try { hostname = new URL(url).hostname; } catch { throw new HttpError(400, "INVALID_URL", "URL nguồn không hợp lệ"); }
+  if (text.length < 200) throw new HttpError(400, "MANUAL_SOURCE_TOO_SHORT", "Nội dung dán thủ công cần ít nhất 200 ký tự");
+  if (project.sources.length >= 12) throw new HttpError(400, "SOURCE_LIMIT", "Mỗi Content Project nhận tối đa 12 nguồn");
+  if (project.sources.some((source) => (source.canonicalUrl ?? source.url) === url)) {
+    throw new HttpError(409, "SOURCE_EXISTS", "Nguồn này đã có trong project");
+  }
+  project.sources.push({
+    id: nanoid(10), url, canonicalUrl: url,
+    title: title || `Nguồn dán thủ công từ ${hostname}`,
+    siteName: hostname, lang: null, leadImage: null,
+    text: text.slice(0, 50_000), fetchedAt: nowIso(),
+  });
+  if (!project.primaryUrl) project.primaryUrl = url;
+  project.status = "researching";
+  writeJapanVipContent(project);
+  res.status(201).json(project);
+});
+
 router.delete("/:id/sources/:sourceId", (req, res) => {
   const project = readJapanVipContent(req.params.id);
   const next = project.sources.filter((s) => s.id !== req.params.sourceId);
