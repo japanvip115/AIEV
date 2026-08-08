@@ -61,6 +61,7 @@
      pass CVD ΔE, chroma, lightness band và contrast ≥3:1 trên nền light. */
   --chart-2: #2f6fed;
   --chart-3: #0d9488;
+  --chart-4: #d97706;
 
   /* Shape & motion */
   --radius: 8px;
@@ -92,6 +93,7 @@
      bằng validator dataviz trên nền --surface dark: pass đủ 5 check. */
   --chart-2: #5b8def;
   --chart-3: #27ab92;
+  --chart-4: #f59e0b;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
 }

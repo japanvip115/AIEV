@@ -54,7 +54,7 @@ export interface JapanVipContentProject {
 function normalizeProject(project: JapanVipContentProject): JapanVipContentProject {
   return {
     ...project,
-    aiProvider: project.aiProvider === "claude" ? "claude" : "codex",
+    aiProvider: project.aiProvider === "claude" || project.aiProvider === "ollama" ? project.aiProvider : "codex",
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
     feedback: Array.isArray(project.feedback) ? project.feedback : [],
   };

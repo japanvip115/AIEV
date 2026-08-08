@@ -369,7 +369,7 @@ export function addTokenUsage(
   inputTokens: number,
   outputTokens: number,
   costUsd: number,
-  provider: "claude" | "gemini" | "openai" = "claude",
+  provider: "claude" | "gemini" | "openai" | "ollama" = "claude",
 ): void {
   db.prepare(
     "INSERT INTO token_usage (sessionId, projectId, inputTokens, outputTokens, costUsd, provider, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",

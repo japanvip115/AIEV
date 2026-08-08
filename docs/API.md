@@ -1215,8 +1215,10 @@ DELETE /api/japanvip-learning/rules/:ruleId
 - Project chọn bài mẫu qua `selectedReferenceIds`. Dữ kiện sản phẩm vẫn chỉ lấy từ nguồn chính thức
   và fact sheet đã duyệt.
 - Phản hồi có `saveAsRule=true` được đưa vào bộ quy tắc dùng chung cho những lần viết sau.
-- Mỗi Content Project lưu `aiProvider: "codex" | "claude"`; tạo dàn ý và viết bài dùng đúng nhà
+- Mỗi Content Project lưu `aiProvider: "codex" | "claude" | "ollama"`; tạo dàn ý và viết bài dùng đúng nhà
   cung cấp đã chọn. Endpoint thêm bài mẫu nhận `aiProvider` riêng cho lượt phân tích đó.
+- Ollama dùng `OLLAMA_URL` (mặc định `http://127.0.0.1:11434`) và `OLLAMA_TEXT_MODEL`
+  (mặc định `qwen3:14b`). `GET /api/japanvip-learning/ai-status` trả trạng thái service/model.
 
 ## Update (cập nhật hệ thống từ GitHub — badge cuối sidebar)
 

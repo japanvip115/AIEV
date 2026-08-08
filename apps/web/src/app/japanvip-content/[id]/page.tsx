@@ -34,6 +34,12 @@ const STATUS: Record<JapanVipContentStatus, { label: string; tone: BadgeTone }> 
   approved: { label: "Đã duyệt", tone: "success" },
 };
 
+const AI_LABEL: Record<JapanVipAiProvider, string> = {
+  codex: "ChatGPT",
+  claude: "Claude",
+  ollama: "Ollama Local",
+};
+
 export default function JapanVipContentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -159,6 +165,7 @@ export default function JapanVipContentDetailPage() {
                 }}>
                   <option value="codex">ChatGPT (Codex CLI)</option>
                   <option value="claude">Claude Code</option>
+                  <option value="ollama">Ollama Local (qwen3:14b)</option>
                 </select>
               </Field>
             </div>
@@ -235,11 +242,11 @@ export default function JapanVipContentDetailPage() {
             </div>
           </Card>
 
-          <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : `${draft.aiProvider === "codex" ? "ChatGPT" : "Claude"} tạo dàn ý`}</Button>}>
+          <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : `${AI_LABEL[draft.aiProvider]} tạo dàn ý`}</Button>}>
             <textarea className="input min-h-72 resize-y font-mono text-sm" value={draft.outline} onChange={(e) => patch("outline", e.target.value)} placeholder="## Tổng quan sản phẩm…" />
           </Card>
 
-          <Card title="Bài viết Markdown" actions={<Button small disabled={busy !== null || !draft.outline.trim()} onClick={() => void run("article", () => generateJapanVipArticle(id))}><Sparkles size={14} /> {busy === "article" ? "Đang viết…" : `${draft.aiProvider === "codex" ? "ChatGPT" : "Claude"} viết bài`}</Button>}>
+          <Card title="Bài viết Markdown" actions={<Button small disabled={busy !== null || !draft.outline.trim()} onClick={() => void run("article", () => generateJapanVipArticle(id))}><Sparkles size={14} /> {busy === "article" ? "Đang viết…" : `${AI_LABEL[draft.aiProvider]} viết bài`}</Button>}>
             <textarea className="input min-h-[560px] resize-y font-mono text-sm leading-6" value={draft.article} onChange={(e) => patch("article", e.target.value)} placeholder="Bài viết hoàn chỉnh sẽ xuất hiện tại đây…" />
           </Card>
 

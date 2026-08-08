@@ -2898,7 +2898,7 @@ export type JapanVipContentStatus =
   | "review"
   | "approved";
 
-export type JapanVipAiProvider = "codex" | "claude";
+export type JapanVipAiProvider = "codex" | "claude" | "ollama";
 
 export interface JapanVipSource {
   id: string;
@@ -3049,6 +3049,13 @@ export interface JapanVipLearningLibrary {
 
 export const getJapanVipLearningLibrary = () =>
   request<JapanVipLearningLibrary>("/api/japanvip-learning");
+
+export interface JapanVipAiStatus {
+  ollama: { running: boolean; model: string; installed: boolean; models: string[] };
+}
+
+export const getJapanVipAiStatus = () =>
+  request<JapanVipAiStatus>("/api/japanvip-learning/ai-status");
 
 export const addJapanVipReferenceArticle = (input: {
   url: string;

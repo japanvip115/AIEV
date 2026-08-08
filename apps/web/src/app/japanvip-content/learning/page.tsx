@@ -15,10 +15,12 @@ import {
   deleteJapanVipLearningRule,
   deleteJapanVipReferenceArticle,
   getJapanVipLearningLibrary,
+  getJapanVipAiStatus,
   updateJapanVipLearningRule,
   updateJapanVipReferenceArticle,
   type JapanVipLearningLibrary,
   type JapanVipAiProvider,
+  type JapanVipAiStatus,
   type JapanVipReferenceKind,
 } from "@/lib/api";
 
@@ -28,8 +30,15 @@ const KIND_LABEL: Record<JapanVipReferenceKind, string> = {
   japanvip: "Bài Japan VIP",
 };
 
+const AI_LABEL: Record<JapanVipAiProvider, string> = {
+  codex: "ChatGPT",
+  claude: "Claude",
+  ollama: "Ollama Local",
+};
+
 export default function JapanVipLearningPage() {
   const [library, setLibrary] = useState<JapanVipLearningLibrary | null>(null);
+  const [aiStatus, setAiStatus] = useState<JapanVipAiStatus | null>(null);
   const [url, setUrl] = useState("");
   const [kind, setKind] = useState<JapanVipReferenceKind>("competitor");
   const [aiProvider, setAiProvider] = useState<JapanVipAiProvider>("codex");
@@ -40,7 +49,9 @@ export default function JapanVipLearningPage() {
 
   const load = useCallback(async () => {
     try {
-      setLibrary(await getJapanVipLearningLibrary());
+      const [nextLibrary, nextStatus] = await Promise.all([getJapanVipLearningLibrary(), getJapanVipAiStatus()]);
+      setLibrary(nextLibrary);
+      setAiStatus(nextStatus);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -84,6 +95,7 @@ export default function JapanVipLearningPage() {
           <select className="input" aria-label="AI phân tích" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as JapanVipAiProvider)}>
             <option value="codex">ChatGPT (Codex CLI)</option>
             <option value="claude">Claude Code</option>
+            <option value="ollama">Ollama Local (qwen3:14b)</option>
           </select>
           <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Nồi cơm, mở bài, SEO…" />
           <Button disabled={!url.trim() || busy !== null} onClick={() => void run("add-article", async () => {
@@ -91,8 +103,13 @@ export default function JapanVipLearningPage() {
             setUrl("");
             setTags("");
             return next;
-          })}><Plus size={15} /> {busy === "add-article" ? `${aiProvider === "codex" ? "ChatGPT" : "Claude"} đang phân tích…` : "Thêm và phân tích"}</Button>
+          })}><Plus size={15} /> {busy === "add-article" ? `${AI_LABEL[aiProvider]} đang phân tích…` : "Thêm và phân tích"}</Button>
         </div>
+        <p className="mt-3 text-xs text-[var(--text-muted)]">
+          Ollama: {aiStatus?.ollama.running
+            ? aiStatus.ollama.installed ? `Sẵn sàng · ${aiStatus.ollama.model}` : `Đang chạy nhưng thiếu ${aiStatus.ollama.model}`
+            : "Chưa chạy"}
+        </p>
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">

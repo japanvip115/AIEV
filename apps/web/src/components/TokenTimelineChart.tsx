@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n";
  * Combo chart SVG thuần - token AI theo ngày.
  * CỘT = tổng token/ngày (--primary mờ 0.35, làm nền), ĐƯỜNG + chấm = token
  * theo từng AI. Màu series đi qua token: Claude --primary, Gemini --chart-2,
- * OpenAI --chart-3 (bộ 3 đã validate CVD/contrast bằng validator dataviz,
+ * OpenAI --chart-3, Ollama --chart-4,
  * light lẫn dark - xem comment trong globals.css). Provider không có dữ liệu
  * thì không vẽ đường và không hiện trong legend. Một trục Y duy nhất - đường
  * luôn ≤ cột tổng nên chung thang đo.
@@ -31,6 +31,7 @@ const PROVIDERS = [
   { id: "claude", label: "Claude", color: "var(--primary)" },
   { id: "gemini", label: "Gemini", color: "var(--chart-2)" },
   { id: "openai", label: "OpenAI", color: "var(--chart-3)" },
+  { id: "ollama", label: "Ollama Local", color: "var(--chart-4)" },
 ] as const;
 
 /** Trần "đẹp" cho trục Y: 1 / 2 / 5 × 10^k. */
