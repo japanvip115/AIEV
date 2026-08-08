@@ -2932,6 +2932,7 @@ export interface JapanVipContentProject {
     category: string;
     note: string;
     savedAsRule: boolean;
+    ruleId: string | null;
     createdAt: string;
   }>;
   hermesReviews: Array<{
@@ -3129,6 +3130,9 @@ export const addJapanVipContentFeedback = (
   id: string,
   input: { category: string; note: string; saveAsRule: boolean }
 ) => post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/feedback`, input);
+
+export const deleteJapanVipContentFeedback = (id: string, feedbackId: string) =>
+  request<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/feedback/${encodeURIComponent(feedbackId)}`, { method: "DELETE" });
 
 export const getTtsModels = () => request<TtsModel[]>("/api/tts/models");
 

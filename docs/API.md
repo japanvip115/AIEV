@@ -1225,6 +1225,9 @@ DELETE /api/japanvip-learning/rules/:ruleId
 - Hermes critic mặc định dùng Nous Portal với `tencent/hy3:free`; có thể đổi bằng
   `HERMES_CRITIC_PROVIDER` và `HERMES_CRITIC_MODEL`. Quy tắc Hermes đề xuất không được tự lưu:
   chỉ phản hồi có `saveAsRule=true` sau thao tác duyệt của người dùng mới vào bộ nhớ chung.
+- `DELETE /api/japanvip-content/:id/feedback/:feedbackId` xóa bài học bị lưu nhầm. Nếu bài học đã
+  thành quy tắc chung, quy tắc liên kết chỉ bị xóa khi không còn phản hồi trùng nào khác sử dụng nó;
+  endpoint tạo phản hồi từ chối nội dung trùng trong cùng project.
 - `POST /api/japanvip-content/:id/images/discover` thu thập ứng viên ảnh từ trang hãng; ảnh mới luôn
   ở trạng thái `pending`. `PATCH/DELETE /api/japanvip-content/:id/images/:imageId` dùng để duyệt,
   loại, gán vai trò, mục nội dung, caption, alt text và nhóm feature. Chỉ ảnh `approved` được đưa vào

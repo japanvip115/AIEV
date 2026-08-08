@@ -15,7 +15,7 @@ import {
   type JapanVipImageStatus,
 } from "../japanVipContent.js";
 import { HttpError, nowIso } from "../util.js";
-import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary } from "../japanVipLearning.js";
+import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary, writeJapanVipLearningLibrary } from "../japanVipLearning.js";
 import { askHermesCritic } from "../hermesCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
 
@@ -264,16 +264,36 @@ router.post("/:id/feedback", (req, res) => {
   const saveAsRule = body.saveAsRule === true;
   if (!note) throw new HttpError(400, "INVALID_FEEDBACK", "Nội dung phản hồi không được để trống");
   if (project.feedback.length >= 100) throw new HttpError(400, "FEEDBACK_LIMIT", "Mỗi project nhận tối đa 100 phản hồi");
-  if (saveAsRule) addJapanVipLearningRule(note, "feedback");
+  const duplicate = project.feedback.find((item) => item.category.toLocaleLowerCase("vi") === category.toLocaleLowerCase("vi") && item.note.toLocaleLowerCase("vi") === note.toLocaleLowerCase("vi"));
+  if (duplicate) throw new HttpError(409, "FEEDBACK_EXISTS", "Bài học này đã được lưu trong project");
+  const rule = saveAsRule ? addJapanVipLearningRule(note, "feedback") : null;
   project.feedback.unshift({
     id: nanoid(10),
     category: category.slice(0, 80),
     note: note.slice(0, 1_000),
     savedAsRule: saveAsRule,
+    ruleId: rule?.id ?? null,
     createdAt: nowIso(),
   });
   writeJapanVipContent(project);
   res.status(201).json(project);
+});
+
+router.delete("/:id/feedback/:feedbackId", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const feedback = project.feedback.find((item) => item.id === req.params.feedbackId);
+  if (!feedback) throw new HttpError(404, "FEEDBACK_NOT_FOUND", "Không tìm thấy bài học cần xóa");
+  project.feedback = project.feedback.filter((item) => item.id !== req.params.feedbackId);
+  if (feedback.savedAsRule) {
+    const stillUsed = project.feedback.some((item) => item.savedAsRule && item.note.toLocaleLowerCase("vi") === feedback.note.toLocaleLowerCase("vi"));
+    if (!stillUsed) {
+      const library = readJapanVipLearningLibrary();
+      library.rules = library.rules.filter((rule) => feedback.ruleId ? rule.id !== feedback.ruleId : rule.text.toLocaleLowerCase("vi") !== feedback.note.toLocaleLowerCase("vi"));
+      writeJapanVipLearningLibrary(library);
+    }
+  }
+  writeJapanVipContent(project);
+  res.json(project);
 });
 
 router.post("/:id/generate-outline", async (req, res) => {

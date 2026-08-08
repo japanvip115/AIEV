@@ -16,6 +16,7 @@ import {
   addJapanVipContentFeedback,
   deleteJapanVipContentSource,
   deleteJapanVipContentImage,
+  deleteJapanVipContentFeedback,
   discoverJapanVipContentImages,
   generateJapanVipArticle,
   generateJapanVipOutline,
@@ -412,9 +413,10 @@ export default function JapanVipContentDetailPage() {
               {draft.feedback.length > 0 && (
                 <div className="mt-3 flex flex-col gap-2">
                   {draft.feedback.slice(0, 5).map((item) => (
-                    <div key={item.id} className="rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm">
-                      <span className="font-medium">{item.category}:</span> {item.note}
-                      {item.savedAsRule && <span className="ml-2 text-xs text-[var(--primary)]">Đã lưu vào bộ nhớ chung</span>}
+                    <div key={item.id} className="flex items-start gap-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm">
+                      <div className="min-w-0 flex-1"><span className="font-medium">{item.category}:</span> {item.note}
+                      {item.savedAsRule && <span className="ml-2 text-xs text-[var(--primary)]">Đã lưu vào bộ nhớ chung</span>}</div>
+                      <IconButton label="Xóa bài học" tone="danger" size="sm" disabled={busy !== null} onClick={() => void run(`delete-feedback-${item.id}`, async () => { const next = await deleteJapanVipContentFeedback(id, item.id); setLearning(await getJapanVipLearningLibrary()); return next; })}><Trash2 size={14} /></IconButton>
                     </div>
                   ))}
                 </div>

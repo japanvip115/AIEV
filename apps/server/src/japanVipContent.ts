@@ -28,6 +28,7 @@ export interface JapanVipContentFeedback {
   category: string;
   note: string;
   savedAsRule: boolean;
+  ruleId: string | null;
   createdAt: string;
 }
 
@@ -100,7 +101,7 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
     ...project,
     aiProvider: project.aiProvider === "claude" || project.aiProvider === "ollama" ? project.aiProvider : "codex",
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
-    feedback: Array.isArray(project.feedback) ? project.feedback : [],
+    feedback: Array.isArray(project.feedback) ? project.feedback.map((item) => ({ ...item, ruleId: typeof item.ruleId === "string" ? item.ruleId : null })) : [],
     hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
     images: Array.isArray(project.images) ? project.images : [],
   };
