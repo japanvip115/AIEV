@@ -51,6 +51,7 @@ export interface JapanVipHermesReview {
   revisionInstructions: string[];
   suggestedRules: string[];
   criteria: JapanVipHermesCriterion[];
+  evaluator?: { provider: "ollama-cloud" | "hermes"; model: string; fallback: boolean };
   createdAt: string;
 }
 

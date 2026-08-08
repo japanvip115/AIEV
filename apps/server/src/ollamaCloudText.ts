@@ -46,6 +46,7 @@ export async function generateOllamaCloudText(input: {
   usageTag: string;
   projectId?: string | null;
   timeoutMs?: number;
+  jsonMode?: boolean;
 }): Promise<{ text: string; inputTokens: number; outputTokens: number; costUsd: number }> {
   if (!OLLAMA_CLOUD_API_KEY) throw new HttpError(503, "OLLAMA_CLOUD_NOT_CONFIGURED", "Ollama Cloud chưa được cấu hình API key trong 9Router.");
   try {
@@ -60,6 +61,7 @@ export async function generateOllamaCloudText(input: {
         ],
         stream: false,
         temperature: 0.3,
+        ...(input.jsonMode ? { response_format: { type: "json_object" } } : {}),
       }),
       signal: AbortSignal.timeout(input.timeoutMs ?? 8 * 60_000),
     });

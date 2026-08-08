@@ -1213,7 +1213,7 @@ PATCH  /api/japanvip-learning/rules/:ruleId
 DELETE /api/japanvip-learning/rules/:ruleId
 ```
 
-Bài nhập qua `japanvip-articles` phải thuộc tên miền `japanvip.vn`, được Hermes chấm 6 tiêu chí và mặc định ở trạng thái chờ duyệt. API `approve` chỉ chấp nhận khi tổng điểm từ 85/100 và tiêu chí độ chính xác từ 80/100; bài đã duyệt được tự động ưu tiên làm nguồn phong cách nội bộ, nhưng không thay thế nguồn hãng cho thông số/claim sản phẩm.
+Bài nhập qua `japanvip-articles` phải thuộc tên miền `japanvip.vn`, được Ollama Cloud (`OLLAMA_CLOUD_MODEL`, mặc định GPT-OSS 120B) chấm 6 tiêu chí và mặc định ở trạng thái chờ duyệt. Nếu Ollama Cloud lỗi hoặc trả sai schema, hệ thống tự chuyển sang Hermes CLI và ghi rõ evaluator trong kết quả. API `approve` chỉ chấp nhận khi tổng điểm từ 85/100 và tiêu chí độ chính xác từ 80/100; bài đã duyệt được tự động ưu tiên làm nguồn phong cách nội bộ, nhưng không thay thế nguồn hãng cho thông số/claim sản phẩm.
 
 - `kind`: `competitor`, `inspiration` hoặc `japanvip`.
 - GPT qua Codex CLI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận

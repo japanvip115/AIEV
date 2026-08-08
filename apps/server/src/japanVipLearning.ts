@@ -34,6 +34,7 @@ export interface JapanVipLearningReview {
   strengths: string[];
   issues: string[];
   criteria: JapanVipLearningReviewCriterion[];
+  evaluator?: { provider: "ollama-cloud" | "hermes"; model: string; fallback: boolean };
   createdAt: string;
 }
 
@@ -166,6 +167,11 @@ export function normalizeLearningReview(value: unknown): JapanVipLearningReview 
     strengths: cleanStrings(raw.strengths, 12),
     issues: cleanStrings(raw.issues, 12),
     criteria,
+    evaluator: raw.evaluator && typeof raw.evaluator === "object" ? {
+      provider: (raw.evaluator as Record<string, unknown>).provider === "ollama-cloud" ? "ollama-cloud" : "hermes",
+      model: typeof (raw.evaluator as Record<string, unknown>).model === "string" ? String((raw.evaluator as Record<string, unknown>).model) : "tencent/hy3:free",
+      fallback: Boolean((raw.evaluator as Record<string, unknown>).fallback),
+    } : undefined,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : nowIso(),
   };
 }

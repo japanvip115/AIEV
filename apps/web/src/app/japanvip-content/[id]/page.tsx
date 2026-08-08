@@ -376,7 +376,7 @@ export default function JapanVipContentDetailPage() {
 
         <section id="review" className="scroll-mt-28">
           <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><ShieldCheck size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 5</p><h2 className="text-xl font-bold">Kiểm soát chất lượng</h2></div></div>
-          <Card title="Hermes chấm điểm & phản biện" actions={<Button small disabled={busy !== null || !draft.article.trim()} onClick={() => void run("hermes-review", () => reviewJapanVipArticleWithHermes(id))}><ShieldCheck size={14} /> {busy === "hermes-review" ? "Hermes đang chấm…" : draft.hermesReviews.length ? "Hermes chấm lại" : "Hermes chấm bài"}</Button>}>
+          <Card title="AI chấm điểm & phản biện" actions={<Button small disabled={busy !== null || !draft.article.trim()} onClick={() => void run("hermes-review", () => reviewJapanVipArticleWithHermes(id))}><ShieldCheck size={14} /> {busy === "hermes-review" ? "Ollama Cloud đang chấm…" : draft.hermesReviews.length ? "Chấm lại bằng Ollama Cloud" : "Ollama Cloud chấm bài"}</Button>}>
             {draft.hermesReviews.length === 0 ? (
               <p className="py-6 text-center text-sm text-[var(--text-muted)]">Sau khi viết bài, dùng Hermes làm giám khảo độc lập. Nhận xét chưa tự động trở thành quy tắc chung.</p>
             ) : (() => {
@@ -384,7 +384,7 @@ export default function JapanVipContentDetailPage() {
               return <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border-2 border-[var(--primary)] bg-[var(--surface-subtle)] p-4">
                   <div className="text-4xl font-bold text-[var(--primary)]">{review.totalScore}<span className="text-base text-[var(--text-muted)]">/100</span></div>
-                  <div><p className="font-semibold">Vòng chấm {review.round}</p><p className="text-sm text-[var(--text-muted)]">{review.summary}</p></div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">Vòng chấm {review.round}</p>{review.evaluator && <Badge tone={review.evaluator.fallback ? "running" : "success"} label={review.evaluator.fallback ? `Dự phòng: Hermes · ${review.evaluator.model}` : `Ollama Cloud · ${review.evaluator.model}`} />}</div><p className="mt-1 text-sm text-[var(--text-muted)]">{review.summary}</p></div>
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
                   {review.criteria.map((criterion) => <div key={criterion.key} className="rounded-[var(--radius)] border border-[var(--border)] p-3">

@@ -2947,6 +2947,7 @@ export interface JapanVipContentProject {
     revisionInstructions: string[];
     suggestedRules: string[];
     criteria: Array<{ key: string; label: string; score: number; maxScore: number; feedback: string }>;
+    evaluator?: { provider: "ollama-cloud" | "hermes"; model: string; fallback: boolean };
     createdAt: string;
   }>;
   selectiveRevision: null | {
@@ -3102,6 +3103,7 @@ export interface JapanVipReferenceArticle {
     strengths: string[];
     issues: string[];
     criteria: Array<{ key: string; label: string; score: number; maxScore: number; feedback: string }>;
+    evaluator?: { provider: "ollama-cloud" | "hermes"; model: string; fallback: boolean };
     createdAt: string;
   } | null;
   approvalStatus: "pending" | "approved" | "rejected";

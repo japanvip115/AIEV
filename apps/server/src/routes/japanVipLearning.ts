@@ -3,7 +3,7 @@ import { Router } from "express";
 import { extractArticleFromUrl } from "../article.js";
 import { extractJson } from "../aiText.js";
 import { generateJapanVipText, parseJapanVipAiProvider } from "../japanVipAi.js";
-import { askHermesCritic } from "../hermesCritic.js";
+import { runJapanVipCritic } from "../japanVipCritic.js";
 import {
   addJapanVipLearningRule,
   normalizeStyleAnalysis,
@@ -48,12 +48,14 @@ async function analyzeJapanVipArticle(text: string, title: string) {
     `TIÊU ĐỀ: ${title}`,
     `NỘI DUNG:\n${text.slice(0, 36_000)}`,
   ].join("\n\n");
-  const raw = await askHermesCritic(prompt);
-  const parsed = extractJson<Record<string, unknown>>(raw);
-  const review = normalizeLearningReview(parsed ? { ...parsed, createdAt: nowIso() } : null);
-  if (!parsed || !review || review.criteria.length !== 6) {
-    throw new HttpError(502, "JAPANVIP_HERMES_REVIEW_FAILED", "Hermes không trả về bảng chấm 6 tiêu chí hợp lệ");
-  }
+  const result = await runJapanVipCritic<Record<string, unknown>>({
+    prompt,
+    usageTag: "japanvip-owned-review",
+    isValid: (parsed) => Array.isArray(parsed.criteria) && parsed.criteria.length === 6,
+  });
+  const parsed = result.parsed;
+  const review = normalizeLearningReview({ ...parsed, evaluator: result.evaluator, createdAt: nowIso() });
+  if (!review) throw new HttpError(502, "JAPANVIP_REVIEW_PARSE_FAILED", "AI không trả về bảng chấm hợp lệ");
   return { review, analysis: normalizeStyleAnalysis(parsed.analysis) };
 }
 

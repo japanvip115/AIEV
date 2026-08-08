@@ -18,7 +18,7 @@ import {
 } from "../japanVipContent.js";
 import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary, writeJapanVipLearningLibrary } from "../japanVipLearning.js";
-import { askHermesCritic } from "../hermesCritic.js";
+import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
 
 const router = Router();
@@ -84,10 +84,14 @@ async function runHermesReview(project: JapanVipContentProject) {
     researchContext(project),
     `BÀI VIẾT CẦN CHẤM:\n${project.article.slice(0, 80_000)}`,
   ].join("\n\n");
-  const raw = await askHermesCritic(prompt);
-  const parsed = extractJson<Record<string, unknown>>(raw);
-  if (!parsed || !Array.isArray(parsed.criteria)) throw new HttpError(502, "HERMES_REVIEW_PARSE_FAILED", "Hermes không trả về bảng chấm điểm hợp lệ");
-  const criteria = parsed.criteria.slice(0, 7).map((item) => {
+  const critic = await runJapanVipCritic<Record<string, unknown>>({
+    prompt,
+    usageTag: "japanvip-article-review",
+    isValid: (parsed) => Array.isArray(parsed.criteria),
+  });
+  const parsed = critic.parsed;
+  const rawCriteria = parsed.criteria as unknown[];
+  const criteria = rawCriteria.slice(0, 7).map((item) => {
     const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
     return {
       key: typeof row.key === "string" ? row.key.slice(0, 40) : "other",
@@ -109,6 +113,7 @@ async function runHermesReview(project: JapanVipContentProject) {
     revisionInstructions: textList(parsed.revisionInstructions),
     suggestedRules: textList(parsed.suggestedRules, 8),
     criteria,
+    evaluator: critic.evaluator,
     createdAt: nowIso(),
   };
   project.hermesReviews.unshift(review);

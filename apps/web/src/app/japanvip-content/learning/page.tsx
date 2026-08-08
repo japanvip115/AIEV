@@ -92,7 +92,7 @@ export default function JapanVipLearningPage() {
 
       <Card title="Chấm bài đã xuất bản trên JapanVIP" actions={<Badge tone="success" label="Nguồn nội bộ" />}>
         <p className="mb-3 text-sm text-[var(--text-muted)]">
-          Dán URL bài trên japanvip.vn. Hermes sẽ chấm 6 tiêu chí; bài chỉ được duyệt làm nguồn học khi tổng điểm ≥85 và độ chính xác ≥80.
+          Dán URL bài trên japanvip.vn. Ollama Cloud GPT-OSS 120B sẽ chấm 6 tiêu chí; bài chỉ được duyệt làm nguồn học khi tổng điểm ≥85 và độ chính xác ≥80.
         </p>
         <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_240px_auto]">
           <input className="input" value={ownedUrl} onChange={(e) => setOwnedUrl(e.target.value)} placeholder="https://japanvip.vn/bai-viet/..." />
@@ -102,7 +102,7 @@ export default function JapanVipLearningPage() {
             setOwnedUrl("");
             setOwnedTags("");
             return next;
-          })}><ShieldCheck size={15} /> {busy === "add-owned" ? "Hermes đang chấm…" : "Nhập và chấm bằng Hermes"}</Button>
+          })}><ShieldCheck size={15} /> {busy === "add-owned" ? "Ollama Cloud đang chấm…" : "Nhập và chấm bằng Ollama Cloud"}</Button>
         </div>
         <p className="mt-3 text-xs text-[var(--text-muted)]">Bài đạt điểm vẫn cần bạn bấm duyệt. Nội dung được dùng để học cách viết, không tự trở thành nguồn xác thực thông số sản phẩm.</p>
       </Card>
@@ -194,7 +194,7 @@ export default function JapanVipLearningPage() {
                     {article.kind === "japanvip" && review && (
                       <div className="mt-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-baseline gap-2"><span className={`text-2xl font-bold ${passesGate ? "text-emerald-600" : "text-amber-600"}`}>{review.totalScore}/100</span><span className="text-xs text-[var(--text-muted)]">Độ chính xác {review.accuracyScore}/100</span></div>
+                          <div><div className="flex items-baseline gap-2"><span className={`text-2xl font-bold ${passesGate ? "text-emerald-600" : "text-amber-600"}`}>{review.totalScore}/100</span><span className="text-xs text-[var(--text-muted)]">Độ chính xác {review.accuracyScore}/100</span></div>{review.evaluator && <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{review.evaluator.fallback ? `Dự phòng: Hermes · ${review.evaluator.model}` : `Chấm bởi Ollama Cloud · ${review.evaluator.model}`}</p>}</div>
                           <div className="flex flex-wrap gap-2">
                             <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`review-${article.id}`, () => reviewJapanVipOwnedArticle(article.id))}><RotateCcw size={13} /> Chấm lại</Button>
                             {article.approvalStatus !== "rejected" && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`reject-${article.id}`, () => rejectJapanVipOwnedArticle(article.id))}><XCircle size={13} /> Loại</Button>}
