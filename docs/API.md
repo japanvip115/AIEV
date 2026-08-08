@@ -1222,8 +1222,15 @@ DELETE /api/japanvip-learning/rules/:ruleId
 - Ollama Cloud dùng proxy OpenAI-compatible của 9Router qua `OLLAMA_CLOUD_URL`,
   `OLLAMA_CLOUD_API_KEY` và `OLLAMA_CLOUD_MODEL` (mặc định `ollama/gpt-oss:120b`).
 - `POST /api/japanvip-content/:id/hermes-review` dùng Hermes làm giám khảo độc lập, lưu bảng điểm
-  7 tiêu chí và đề xuất sửa vào `hermesReviews`. `POST /api/japanvip-content/:id/revise-from-hermes`
-  giao bản sửa cho AI đang được project chọn; người dùng có thể gọi Hermes chấm lại sau đó.
+  7 tiêu chí và đề xuất sửa vào `hermesReviews`.
+- Sửa theo Hermes dùng quy trình chọn lọc, không viết lại toàn bài:
+  - `POST /api/japanvip-content/:id/selective-revision/preview` với
+    `{ categories: ["cta"|"naturalness"|"claims"|"repetition"|"seo"], request? }` tạo tối đa 8 cặp
+    đoạn cũ/mới để xem trước, chưa đổi bài.
+  - `POST /api/japanvip-content/:id/selective-revision/apply` với `{ changeIds: [] }` chỉ áp dụng
+    các thay đổi được chọn; fingerprint chặn ghi đè nếu bài đã đổi.
+  - `DELETE /api/japanvip-content/:id/selective-revision` bỏ bản xem trước.
+  - Tổng đoạn bị thay thế bị giới hạn 45% bài; endpoint `revise-from-hermes` cũ trả 410.
 - Hermes critic mặc định dùng Nous Portal với `tencent/hy3:free`; có thể đổi bằng
   `HERMES_CRITIC_PROVIDER` và `HERMES_CRITIC_MODEL`. Quy tắc Hermes đề xuất không được tự lưu:
   chỉ phản hồi có `saveAsRule=true` sau thao tác duyệt của người dùng mới vào bộ nhớ chung.

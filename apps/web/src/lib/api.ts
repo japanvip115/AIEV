@@ -2899,6 +2899,7 @@ export type JapanVipContentStatus =
   | "approved";
 
 export type JapanVipAiProvider = "codex" | "claude" | "ollama" | "ollama-cloud";
+export type JapanVipRevisionCategory = "cta" | "naturalness" | "claims" | "repetition" | "seo";
 
 export interface JapanVipSource {
   id: string;
@@ -2948,6 +2949,21 @@ export interface JapanVipContentProject {
     criteria: Array<{ key: string; label: string; score: number; maxScore: number; feedback: string }>;
     createdAt: string;
   }>;
+  selectiveRevision: null | {
+    id: string;
+    reviewId: string;
+    articleFingerprint: string;
+    categories: JapanVipRevisionCategory[];
+    request: string;
+    changes: Array<{
+      id: string;
+      category: JapanVipRevisionCategory;
+      before: string;
+      after: string;
+      reason: string;
+    }>;
+    createdAt: string;
+  };
   images: Array<{
     id: string;
     url: string;
@@ -3034,8 +3050,16 @@ export const generateJapanVipArticle = (id: string) =>
 export const reviewJapanVipArticleWithHermes = (id: string) =>
   post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/hermes-review`);
 
-export const reviseJapanVipArticleFromHermes = (id: string) =>
-  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/revise-from-hermes`);
+export const previewJapanVipSelectiveRevision = (
+  id: string,
+  input: { categories: JapanVipRevisionCategory[]; request?: string }
+) => post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/selective-revision/preview`, input);
+
+export const applyJapanVipSelectiveRevision = (id: string, changeIds: string[]) =>
+  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/selective-revision/apply`, { changeIds });
+
+export const cancelJapanVipSelectiveRevision = (id: string) =>
+  request<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/selective-revision`, { method: "DELETE" });
 
 export const discoverJapanVipContentImages = (id: string, url: string, sourceType: "official" | "owned" | "reference-only" = "official") =>
   post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/images/discover`, { url, sourceType });

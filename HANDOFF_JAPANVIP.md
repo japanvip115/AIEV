@@ -12,7 +12,7 @@ Mở rộng AIEV thành quy trình sản xuất nội dung sản phẩm cho Japa
 - Bản đang chạy: `/Users/tohongson/AIEV`
 - Nhánh: `feature/japanvip-ollama-provider`
 - Nhánh triển khai: `japanvip/main`
-- HEAD đã push cả hai nhánh: `ba93b2c feat(japanvip): add Ollama Cloud via 9Router`
+- HEAD trước đợt sửa chọn lọc: `f0df6c9 docs(japanvip): add account handoff`
 - Các commit quan trọng trước đó:
   - `b18ddaf`: xóa bài học AI đã lưu nhầm
   - `ef45aeb`: quy trình ảnh chính hãng
@@ -76,9 +76,12 @@ Mở rộng AIEV thành quy trình sản xuất nội dung sản phẩm cho Japa
 ## Việc ưu tiên tiếp theo
 
 1. Khi người dùng cung cấp URL chính hãng, tạo Content Project mới và khóa exact model/suffix/điện áp trước khi viết.
-2. Tính năng quan trọng chưa làm: **Sửa có chọn lọc theo phản biện**.
-   - Hiện endpoint `POST /api/japanvip-content/:id/revise-from-hermes` gửi toàn bộ bài và có thể viết lại toàn bài, tốn quota.
-   - Cần thêm “Yêu cầu sửa vòng này”, checkbox CTA/văn phong/claim/đoạn lặp/SEO, AI trả các đoạn thay thế, preview diff và chỉ áp dụng phần người dùng duyệt.
+2. **Sửa có chọn lọc theo phản biện đã hoàn thành trong đợt tiếp quản này**:
+   - Chọn CTA/văn phong/claim/đoạn lặp/SEO và nhập yêu cầu riêng cho vòng sửa.
+   - AI chỉ trả tối đa 8 cặp đoạn cũ/mới; không ghi đè bài ngay.
+   - Giao diện xem trước hai cột, cho phép bỏ chọn từng thay đổi rồi mới áp dụng.
+   - Backend giới hạn tổng phạm vi thay thế 45%, yêu cầu đoạn cũ khớp duy nhất và dùng fingerprint để chặn ghi đè nếu bài đã đổi.
+   - Endpoint viết lại toàn bài cũ đã bị tắt với HTTP 410.
 3. Khi có bài mới, kiểm tra ảnh chính hãng đúng model, ảnh nhỏ gom nhóm và trải nghiệm desktop/mobile.
 4. Có thể bổ sung model selector cho Ollama Cloud sau này, nhưng chỉ hiển thị các model đã smoke-test; không tin hoàn toàn danh sách `/v1/models` vì có model retired/không truy cập được.
 

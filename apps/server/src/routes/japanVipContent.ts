@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { createHash } from "node:crypto";
 import { Router } from "express";
 import { extractArticleFromUrl } from "../article.js";
 import { extractJson } from "../aiText.js";
@@ -13,6 +14,7 @@ import {
   type JapanVipContentStatus,
   type JapanVipImageRole,
   type JapanVipImageStatus,
+  type JapanVipRevisionCategory,
 } from "../japanVipContent.js";
 import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary, writeJapanVipLearningLibrary } from "../japanVipLearning.js";
@@ -29,6 +31,28 @@ const STATUSES = new Set<JapanVipContentStatus>([
 ]);
 const IMAGE_ROLES = new Set<JapanVipImageRole>(["hero", "main-packshot", "alternate-angle", "feature", "feature-small", "detail", "dimensions", "maintenance"]);
 const IMAGE_STATUSES = new Set<JapanVipImageStatus>(["pending", "approved", "rejected"]);
+const REVISION_CATEGORIES = new Set<JapanVipRevisionCategory>(["cta", "naturalness", "claims", "repetition", "seo"]);
+const REVISION_CATEGORY_LABELS: Record<JapanVipRevisionCategory, string> = {
+  cta: "CTA và tư vấn mua hàng",
+  naturalness: "câu mang văn phong dịch hoặc thiếu tự nhiên",
+  claims: "claim, bằng chứng và giới hạn cần nêu rõ",
+  repetition: "đoạn lặp, dài dòng hoặc trùng ý",
+  seo: "tiêu đề, heading và cách dùng từ khóa SEO",
+};
+
+function articleFingerprint(article: string): string {
+  return createHash("sha256").update(article).digest("hex");
+}
+
+function exactOccurrenceCount(haystack: string, needle: string): number {
+  let count = 0;
+  let offset = 0;
+  while (needle && (offset = haystack.indexOf(needle, offset)) !== -1) {
+    count += 1;
+    offset += needle.length;
+  }
+  return count;
+}
 
 function imageWritingContext(project: JapanVipContentProject): string {
   const approved = project.images.filter((image) => image.status === "approved");
@@ -164,6 +188,7 @@ router.patch("/:id", (req, res) => {
     project.status = body.status as JapanVipContentStatus;
   }
   if (!project.name) throw new HttpError(400, "INVALID_NAME", "Tên project không được để trống");
+  if (project.selectiveRevision && articleFingerprint(project.article) !== project.selectiveRevision.articleFingerprint) project.selectiveRevision = null;
   writeJapanVipContent(project);
   res.json(project);
 });
@@ -356,6 +381,7 @@ router.post("/:id/generate-article", async (req, res) => {
     );
   }
   project.article = article;
+  project.selectiveRevision = null;
   project.status = "review";
   writeJapanVipContent(project);
   res.json(project);
@@ -366,25 +392,99 @@ router.post("/:id/hermes-review", async (req, res) => {
 });
 
 router.post("/:id/revise-from-hermes", async (req, res) => {
+  throw new HttpError(410, "FULL_REVISION_DISABLED", "Sửa toàn bài đã được tắt. Hãy dùng Sửa có chọn lọc để xem trước và áp dụng từng thay đổi.");
+});
+
+router.post("/:id/selective-revision/preview", async (req, res) => {
   const project = readJapanVipContent(req.params.id);
   const review = project.hermesReviews[0];
   if (!review) throw new HttpError(400, "NO_HERMES_REVIEW", "Cần để Hermes phản biện trước khi sửa bài");
+  if (!project.article.trim()) throw new HttpError(400, "NO_ARTICLE", "Cần có bài viết trước khi sửa chọn lọc");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const categories = Array.isArray(body.categories)
+    ? [...new Set(body.categories.filter((value): value is JapanVipRevisionCategory => typeof value === "string" && REVISION_CATEGORIES.has(value as JapanVipRevisionCategory)))]
+    : [];
+  if (!categories.length) throw new HttpError(400, "NO_REVISION_CATEGORY", "Hãy chọn ít nhất một hạng mục cần sửa");
+  const request = typeof body.request === "string" ? body.request.trim().slice(0, 2_000) : "";
   const prompt = [
-    "Bạn là biên tập viên senior của japanvip.vn. Hãy sửa bài theo phản biện Hermes bên dưới.",
+    "Bạn là biên tập viên senior của japanvip.vn. Hãy đề xuất các chỉnh sửa CỤC BỘ theo phản biện Hermes.",
+    "Không viết lại toàn bài. Chỉ trả tối đa 8 thay đổi thật sự cần thiết thuộc đúng hạng mục đã chọn.",
+    "Mỗi before phải được chép NGUYÊN VĂN từ bài hiện tại, đủ dài để chỉ xuất hiện đúng một lần. after chỉ là đoạn thay thế tương ứng.",
     "Giữ nguyên mọi dữ kiện đúng; không bổ sung claim, giá, bảo hành, chứng nhận hoặc trải nghiệm chưa có trong nguồn chính thức/fact sheet.",
-    "Không sao chép bài tham khảo. Xuất Markdown thuần, không giải thích và không bọc code fence.",
+    "Không xóa ảnh, bảng thông số hoặc heading không thuộc hạng mục đã chọn. Không sao chép bài tham khảo.",
+    "Trả JSON thuần: {\"changes\":[{\"category\":\"cta|naturalness|claims|repetition|seo\",\"before\":\"đoạn nguyên văn\",\"after\":\"đoạn thay thế\",\"reason\":\"lý do ngắn\"}] }.",
+    `HẠNG MỤC ĐƯỢC CHỌN:\n${categories.map((category) => `- ${category}: ${REVISION_CATEGORY_LABELS[category]}`).join("\n")}`,
+    request ? `YÊU CẦU RIÊNG CỦA BIÊN TẬP VIÊN:\n${request}` : "",
     `PHẢN BIỆN HERMES:\n${review.revisionInstructions.map((item) => `- ${item}`).join("\n")}`,
     japanVipLearningContext(project.selectedReferenceIds),
     researchContext(project),
     `BÀI HIỆN TẠI:\n${project.article}`,
-  ].join("\n\n");
-  const ai = await generateJapanVipText(project.aiProvider, { prompt, usageTag: "japanvip-hermes-revision", projectId: project.id, timeoutMs: 5 * 60_000 });
-  const article = ai.text.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/```$/, "").trim();
-  if (article.length < 300) throw new HttpError(502, "ARTICLE_TOO_SHORT", "Bản sửa AI trả về quá ngắn");
+  ].filter(Boolean).join("\n\n");
+  const ai = await generateJapanVipText(project.aiProvider, { prompt, usageTag: "japanvip-selective-revision", projectId: project.id, timeoutMs: 5 * 60_000 });
+  const parsed = extractJson<{ changes?: unknown }>(ai.text);
+  if (!parsed || !Array.isArray(parsed.changes)) throw new HttpError(502, "SELECTIVE_REVISION_PARSE_FAILED", "AI không trả về danh sách thay đổi hợp lệ");
+
+  const occupied: Array<{ start: number; end: number }> = [];
+  let totalBeforeLength = 0;
+  const changes = parsed.changes.slice(0, 8).flatMap((item) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const category = typeof row.category === "string" && categories.includes(row.category as JapanVipRevisionCategory) ? row.category as JapanVipRevisionCategory : null;
+    const before = typeof row.before === "string" ? row.before.trim() : "";
+    const after = typeof row.after === "string" ? row.after.trim() : "";
+    const reason = typeof row.reason === "string" ? row.reason.trim().slice(0, 500) : "";
+    if (!category || before.length < 12 || before.length > 6_000 || !after || after.length > 8_000 || before === after) return [];
+    if (exactOccurrenceCount(project.article, before) !== 1) return [];
+    const start = project.article.indexOf(before);
+    const end = start + before.length;
+    if (occupied.some((range) => start < range.end && end > range.start)) return [];
+    occupied.push({ start, end });
+    totalBeforeLength += before.length;
+    return [{ id: nanoid(10), category, before, after, reason }];
+  });
+  if (!changes.length) throw new HttpError(502, "NO_SAFE_SELECTIVE_CHANGES", "AI chưa tạo được thay đổi cục bộ an toàn. Hãy chọn hạng mục khác hoặc ghi yêu cầu cụ thể hơn.");
+  if (totalBeforeLength > project.article.length * 0.45) throw new HttpError(502, "SELECTIVE_REVISION_TOO_LARGE", "Phạm vi AI đề xuất vượt 45% bài viết nên đã bị từ chối để tránh viết lại toàn bài.");
+  project.selectiveRevision = {
+    id: nanoid(10),
+    reviewId: review.id,
+    articleFingerprint: articleFingerprint(project.article),
+    categories,
+    request,
+    changes,
+    createdAt: nowIso(),
+  };
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
+router.post("/:id/selective-revision/apply", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const proposal = project.selectiveRevision;
+  if (!proposal) throw new HttpError(400, "NO_SELECTIVE_REVISION", "Chưa có bản sửa chọn lọc để áp dụng");
+  if (articleFingerprint(project.article) !== proposal.articleFingerprint) {
+    throw new HttpError(409, "ARTICLE_CHANGED", "Bài viết đã thay đổi sau khi tạo bản xem trước. Hãy tạo lại đề xuất sửa để tránh ghi đè nhầm.");
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const requestedIds = new Set(Array.isArray(body.changeIds) ? body.changeIds.filter((value): value is string => typeof value === "string") : []);
+  const selected = proposal.changes.filter((change) => requestedIds.has(change.id));
+  if (!selected.length) throw new HttpError(400, "NO_SELECTED_CHANGES", "Hãy chọn ít nhất một thay đổi để áp dụng");
+  const replacements = selected.map((change) => {
+    if (exactOccurrenceCount(project.article, change.before) !== 1) throw new HttpError(409, "REVISION_TARGET_CHANGED", "Một đoạn cần sửa không còn khớp với bài hiện tại. Hãy tạo lại bản xem trước.");
+    return { ...change, start: project.article.indexOf(change.before) };
+  }).sort((a, b) => b.start - a.start);
+  let article = project.article;
+  for (const change of replacements) article = article.slice(0, change.start) + change.after + article.slice(change.start + change.before.length);
   const copiedExcerpt = findCopiedReferenceExcerpt(article, project.selectedReferenceIds);
   if (copiedExcerpt) throw new HttpError(502, "ARTICLE_TOO_SIMILAR", "Bản sửa lặp lại câu dài từ bài tham khảo");
   project.article = article;
+  project.selectiveRevision = null;
   project.status = "review";
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
+router.delete("/:id/selective-revision", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  project.selectiveRevision = null;
   writeJapanVipContent(project);
   res.json(project);
 });

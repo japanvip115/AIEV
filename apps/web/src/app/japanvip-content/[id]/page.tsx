@@ -21,7 +21,9 @@ import {
   generateJapanVipArticle,
   generateJapanVipOutline,
   reviewJapanVipArticleWithHermes,
-  reviseJapanVipArticleFromHermes,
+  previewJapanVipSelectiveRevision,
+  applyJapanVipSelectiveRevision,
+  cancelJapanVipSelectiveRevision,
   getJapanVipContentProject,
   getJapanVipLearningLibrary,
   updateJapanVipContentProject,
@@ -30,6 +32,7 @@ import {
   type JapanVipAiProvider,
   type JapanVipContentStatus,
   type JapanVipLearningLibrary,
+  type JapanVipRevisionCategory,
 } from "@/lib/api";
 
 const STATUS: Record<JapanVipContentStatus, { label: string; tone: BadgeTone }> = {
@@ -47,6 +50,16 @@ const AI_LABEL: Record<JapanVipAiProvider, string> = {
   "ollama-cloud": "Ollama Cloud",
 };
 
+const REVISION_OPTIONS: Array<{ id: JapanVipRevisionCategory; label: string }> = [
+  { id: "cta", label: "CTA" },
+  { id: "naturalness", label: "Văn phong dịch" },
+  { id: "claims", label: "Claim & bằng chứng" },
+  { id: "repetition", label: "Đoạn lặp" },
+  { id: "seo", label: "SEO & heading" },
+];
+
+const REVISION_LABEL = Object.fromEntries(REVISION_OPTIONS.map((item) => [item.id, item.label])) as Record<JapanVipRevisionCategory, string>;
+
 export default function JapanVipContentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -58,6 +71,9 @@ export default function JapanVipContentDetailPage() {
   const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
   const [feedbackNote, setFeedbackNote] = useState("");
   const [saveAsRule, setSaveAsRule] = useState(true);
+  const [revisionCategories, setRevisionCategories] = useState<JapanVipRevisionCategory[]>(["cta", "naturalness", "claims", "repetition"]);
+  const [revisionRequest, setRevisionRequest] = useState("");
+  const [selectedRevisionChangeIds, setSelectedRevisionChangeIds] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +91,10 @@ export default function JapanVipContentDetailPage() {
   }, [id]);
 
   useEffect(() => void load(), [load]);
+
+  useEffect(() => {
+    if (draft?.selectiveRevision) setSelectedRevisionChangeIds(draft.selectiveRevision.changes.map((change) => change.id));
+  }, [draft?.selectiveRevision?.id]);
 
   const dirty = useMemo(() => JSON.stringify(project) !== JSON.stringify(draft), [project, draft]);
   const workflow = useMemo(() => draft ? [
@@ -374,7 +394,62 @@ export default function JapanVipContentDetailPage() {
                   </div>)}
                 </div>
                 {review.revisionInstructions.length > 0 && <div><p className="mb-2 font-semibold">Việc cần sửa</p><ul className="list-disc space-y-1 pl-5 text-sm">{review.revisionInstructions.map((item) => <li key={item}>{item}</li>)}</ul></div>}
-                <Button small disabled={busy !== null || review.revisionInstructions.length === 0} onClick={() => void run("hermes-revise", () => reviseJapanVipArticleFromHermes(id))}><WandSparkles size={14} /> {busy === "hermes-revise" ? `${AI_LABEL[draft.aiProvider]} đang sửa…` : `${AI_LABEL[draft.aiProvider]} sửa theo phản biện`}</Button>
+                <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">Sửa có chọn lọc</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">AI chỉ đề xuất các đoạn thay thế. Bài viết chưa thay đổi cho tới khi bạn xem và áp dụng.</p>
+                    </div>
+                    <Badge tone="muted" label={`Dùng ${AI_LABEL[draft.aiProvider]}`} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {REVISION_OPTIONS.map((option) => {
+                      const checked = revisionCategories.includes(option.id);
+                      return <label key={option.id} className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${checked ? "border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface))] text-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]"}`}>
+                        <input className="sr-only" type="checkbox" checked={checked} disabled={busy !== null} onChange={(e) => setRevisionCategories((current) => e.target.checked ? [...current, option.id] : current.filter((item) => item !== option.id))} />
+                        {option.label}
+                      </label>;
+                    })}
+                  </div>
+                  <textarea className="input mt-3 min-h-20 resize-y" value={revisionRequest} disabled={busy !== null} onChange={(e) => setRevisionRequest(e.target.value)} placeholder="Yêu cầu sửa vòng này, ví dụ: giữ nguyên bảng thông số, chỉ rút gọn CTA cuối bài…" />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button small disabled={busy !== null || review.revisionInstructions.length === 0 || revisionCategories.length === 0} onClick={() => void run("selective-preview", async () => {
+                      const next = await previewJapanVipSelectiveRevision(id, { categories: revisionCategories, request: revisionRequest.trim() });
+                      setSelectedRevisionChangeIds(next.selectiveRevision?.changes.map((change) => change.id) ?? []);
+                      return next;
+                    })}><WandSparkles size={14} /> {busy === "selective-preview" ? `${AI_LABEL[draft.aiProvider]} đang đề xuất…` : draft.selectiveRevision ? "Tạo lại bản xem trước" : "Xem trước phần cần sửa"}</Button>
+                    {draft.selectiveRevision && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run("selective-cancel", async () => {
+                      const next = await cancelJapanVipSelectiveRevision(id);
+                      setSelectedRevisionChangeIds([]);
+                      return next;
+                    })}><Trash2 size={14} /> Bỏ bản xem trước</Button>}
+                  </div>
+                </div>
+                {draft.selectiveRevision && <div className="rounded-[var(--radius)] border-2 border-[var(--primary)] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><p className="font-semibold">Bản xem trước thay đổi</p><p className="mt-1 text-xs text-[var(--text-muted)]">{draft.selectiveRevision.changes.length} đề xuất · chọn từng mục muốn áp dụng</p></div>
+                    <Button small disabled={busy !== null || selectedRevisionChangeIds.length === 0} onClick={() => void run("selective-apply", async () => {
+                      const next = await applyJapanVipSelectiveRevision(id, selectedRevisionChangeIds);
+                      setSelectedRevisionChangeIds([]);
+                      return next;
+                    })}><CheckCircle2 size={14} /> {busy === "selective-apply" ? "Đang áp dụng…" : `Áp dụng ${selectedRevisionChangeIds.length} thay đổi`}</Button>
+                  </div>
+                  <div className="mt-4 flex flex-col gap-3">
+                    {draft.selectiveRevision.changes.map((change, index) => {
+                      const checked = selectedRevisionChangeIds.includes(change.id);
+                      return <div key={change.id} className={`rounded-[var(--radius)] border p-3 ${checked ? "border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_5%,var(--surface))]" : "border-[var(--border)] opacity-65"}`}>
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input className="mt-1 h-4 w-4 accent-[var(--primary)]" type="checkbox" checked={checked} disabled={busy !== null} onChange={(e) => setSelectedRevisionChangeIds((current) => e.target.checked ? [...current, change.id] : current.filter((item) => item !== change.id))} />
+                          <span className="min-w-0 flex-1"><span className="font-semibold">{index + 1}. {REVISION_LABEL[change.category]}</span>{change.reason && <span className="mt-1 block text-xs text-[var(--text-muted)]">{change.reason}</span>}</span>
+                        </label>
+                        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                          <div className="min-w-0 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-950"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-red-700">Đoạn hiện tại</p><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans leading-6">{change.before}</pre></div>
+                          <div className="min-w-0 rounded-[var(--radius)] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-700">Đoạn đề xuất</p><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans leading-6">{change.after}</pre></div>
+                        </div>
+                      </div>;
+                    })}
+                  </div>
+                </div>}
                 {review.suggestedRules.length > 0 && <div className="border-t border-[var(--border)] pt-4"><p className="font-semibold">Quy tắc Hermes đề xuất — chỉ lưu khi bạn duyệt</p><div className="mt-2 flex flex-col gap-2">{review.suggestedRules.map((rule) => <div key={rule} className="flex items-start justify-between gap-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm"><span>{rule}</span><Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`hermes-rule-${rule}`, async () => { const next = await addJapanVipContentFeedback(id, { category: "Hermes đề xuất", note: rule, saveAsRule: true }); setLearning(await getJapanVipLearningLibrary()); return next; })}>Duyệt & lưu</Button></div>)}</div></div>}
               </div>;
             })()}

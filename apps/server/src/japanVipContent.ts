@@ -54,6 +54,26 @@ export interface JapanVipHermesReview {
   createdAt: string;
 }
 
+export type JapanVipRevisionCategory = "cta" | "naturalness" | "claims" | "repetition" | "seo";
+
+export interface JapanVipSelectiveRevisionChange {
+  id: string;
+  category: JapanVipRevisionCategory;
+  before: string;
+  after: string;
+  reason: string;
+}
+
+export interface JapanVipSelectiveRevision {
+  id: string;
+  reviewId: string;
+  articleFingerprint: string;
+  categories: JapanVipRevisionCategory[];
+  request: string;
+  changes: JapanVipSelectiveRevisionChange[];
+  createdAt: string;
+}
+
 export type JapanVipImageRole = "hero" | "main-packshot" | "alternate-angle" | "feature" | "feature-small" | "detail" | "dimensions" | "maintenance";
 export type JapanVipImageStatus = "pending" | "approved" | "rejected";
 
@@ -91,6 +111,7 @@ export interface JapanVipContentProject {
   notes: string;
   feedback: JapanVipContentFeedback[];
   hermesReviews: JapanVipHermesReview[];
+  selectiveRevision: JapanVipSelectiveRevision | null;
   images: JapanVipContentImage[];
   createdAt: string;
   updatedAt: string;
@@ -103,6 +124,7 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
     feedback: Array.isArray(project.feedback) ? project.feedback.map((item) => ({ ...item, ruleId: typeof item.ruleId === "string" ? item.ruleId : null })) : [],
     hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
+    selectiveRevision: project.selectiveRevision && typeof project.selectiveRevision === "object" ? project.selectiveRevision : null,
     images: Array.isArray(project.images) ? project.images : [],
   };
 }
@@ -181,6 +203,7 @@ export function createJapanVipContent(input: {
     notes: "",
     feedback: [],
     hermesReviews: [],
+    selectiveRevision: null,
     images: [],
     createdAt: now,
     updatedAt: now,
