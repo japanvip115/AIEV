@@ -134,15 +134,29 @@ export default function JapanVipLearningPage() {
                       <Badge tone={article.kind === "japanvip" ? "success" : "muted"} label={KIND_LABEL[article.kind]} />
                     </div>
                     <p className="mt-1 text-meta text-[var(--text-muted)]">{article.siteName || "Nguồn web"} · {article.tags.join(", ") || "chưa gắn nhãn"}</p>
-                    <p className="mt-3 text-sm leading-6">{article.analysis.summary || "Chưa có tóm tắt phong cách."}</p>
                     {article.analysis.reusableLessons.length > 0 && (
-                      <div className="mt-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Bài học có thể áp dụng</p>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                          {article.analysis.reusableLessons.slice(0, 5).map((lesson) => <li key={lesson}>{lesson}</li>)}
-                        </ul>
-                      </div>
+                      <details open className="group mt-3 overflow-hidden rounded-[var(--radius)] border-2 border-[var(--primary)] bg-[var(--surface)] shadow-sm">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface))] px-4 py-3 marker:content-none">
+                          <span className="flex items-center gap-2 font-semibold text-[var(--primary)]">
+                            <BookOpenCheck size={18} />
+                            Bài học AI rút ra để áp dụng
+                          </span>
+                          <span className="rounded-full bg-[var(--primary)] px-2.5 py-1 text-xs font-semibold text-white">
+                            {article.analysis.reusableLessons.length} bài học
+                          </span>
+                        </summary>
+                        <div className="border-t border-[var(--border)] px-4 py-3">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Bài học có thể áp dụng</p>
+                          <ul className="list-disc space-y-2 pl-5 text-sm leading-6">
+                            {article.analysis.reusableLessons.slice(0, 5).map((lesson) => <li key={lesson}>{lesson}</li>)}
+                          </ul>
+                        </div>
+                      </details>
                     )}
+                    <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
+                      <span className="font-medium text-[var(--text)]">Tóm tắt cách viết: </span>
+                      {article.analysis.summary || "Chưa có tóm tắt phong cách."}
+                    </p>
                   </div>
                   <IconButton label="Xóa bài tham khảo" tone="danger" size="sm" disabled={busy !== null} onClick={() => void run(`delete-${article.id}`, () => deleteJapanVipReferenceArticle(article.id))}>
                     <Trash2 size={14} />
