@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Brain, CheckCircle2, Database, ExternalLink, FileCheck2, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
+import { ArrowLeft, Brain, CheckCircle2, Database, ExternalLink, FileCheck2, Images, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,6 +15,8 @@ import {
   addJapanVipContentSource,
   addJapanVipContentFeedback,
   deleteJapanVipContentSource,
+  deleteJapanVipContentImage,
+  discoverJapanVipContentImages,
   generateJapanVipArticle,
   generateJapanVipOutline,
   reviewJapanVipArticleWithHermes,
@@ -22,6 +24,7 @@ import {
   getJapanVipContentProject,
   getJapanVipLearningLibrary,
   updateJapanVipContentProject,
+  updateJapanVipContentImage,
   type JapanVipContentProject,
   type JapanVipAiProvider,
   type JapanVipContentStatus,
@@ -48,6 +51,7 @@ export default function JapanVipContentDetailPage() {
   const [project, setProject] = useState<JapanVipContentProject | null>(null);
   const [draft, setDraft] = useState<JapanVipContentProject | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [imageSourceUrl, setImageSourceUrl] = useState("");
   const [learning, setLearning] = useState<JapanVipLearningLibrary | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -73,6 +77,7 @@ export default function JapanVipContentDetailPage() {
   const dirty = useMemo(() => JSON.stringify(project) !== JSON.stringify(draft), [project, draft]);
   const workflow = useMemo(() => draft ? [
     { label: "Nghiên cứu", href: "#research", done: draft.sources.length > 0 || draft.facts.length > 0 },
+    { label: "Hình ảnh", href: "#images", done: draft.images.some((image) => image.status === "approved") },
     { label: "Dàn ý", href: "#outline", done: Boolean(draft.outline.trim()) },
     { label: "Bài viết", href: "#article", done: Boolean(draft.article.trim()) },
     { label: "Phản biện", href: "#review", done: draft.hermesReviews.length > 0 },
@@ -182,7 +187,7 @@ export default function JapanVipContentDetailPage() {
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng quan dự án">
-        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Tiến độ</p><p className="mt-2 text-2xl font-bold">{completedSteps}/5</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${completedSteps * 20}%` }} /></div></div>
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Tiến độ</p><p className="mt-2 text-2xl font-bold">{completedSteps}/{workflow.length}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${workflow.length ? completedSteps / workflow.length * 100 : 0}%` }} /></div></div>
         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Dữ liệu đã khóa</p><p className="mt-2 text-2xl font-bold">{draft.sources.length} <span className="text-sm font-medium text-[var(--text-muted)]">nguồn</span> · {draft.facts.length} <span className="text-sm font-medium text-[var(--text-muted)]">fact</span></p></div>
         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">AI sản xuất</p><p className="mt-2 text-lg font-bold">{AI_LABEL[draft.aiProvider]}</p><p className="mt-1 text-xs text-[var(--text-muted)]">Áp dụng cho dàn ý và bài viết</p></div>
         <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Bản thảo</p><p className="mt-2 text-2xl font-bold">{articleWords.toLocaleString("vi-VN")} <span className="text-sm font-medium text-[var(--text-muted)]">từ</span></p><p className="mt-1 text-xs text-[var(--text-muted)]">Hermes: {draft.hermesReviews[0] ? `${draft.hermesReviews[0].totalScore}/100` : "chưa chấm"}</p></div>
@@ -261,8 +266,38 @@ export default function JapanVipContentDetailPage() {
           </div>
         </section>
 
+        <section id="images" className="scroll-mt-28">
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><Images size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 2</p><h2 className="text-xl font-bold">Ảnh sản phẩm và tính năng</h2></div></div>
+          <Card title="Kho ảnh đã kiểm duyệt" actions={<span className="text-xs text-[var(--text-muted)]">{draft.images.filter((image) => image.status === "approved").length} đã duyệt · {draft.images.filter((image) => image.status === "pending").length} chờ duyệt</span>}>
+            <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-sm font-semibold">Thu thập từ trang chính thức của hãng</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Chỉ ảnh bạn duyệt mới được chèn vào bài. Hệ thống không dùng ảnh đối thủ làm dữ kiện hoặc tài sản xuất bản.</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input className="input flex-1" value={imageSourceUrl} onChange={(e) => setImageSourceUrl(e.target.value)} placeholder="Dán URL gallery, feature hoặc trang sản phẩm của hãng…" />
+                <Button disabled={!imageSourceUrl.trim() || busy !== null} onClick={() => void run("discover-images", async () => { const next = await discoverJapanVipContentImages(id, imageSourceUrl.trim(), "official"); setImageSourceUrl(""); return next; })}><Images size={15} /> {busy === "discover-images" ? "Đang thu thập…" : "Thu thập ảnh hãng"}</Button>
+              </div>
+            </div>
+            {draft.images.length > 0 ? <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              {draft.images.map((image) => <article key={image.id} className={`overflow-hidden rounded-[var(--radius)] border ${image.status === "approved" ? "border-emerald-400" : image.status === "rejected" ? "border-red-300 opacity-60" : "border-[var(--border)]"}`}>
+                <div className="grid h-44 place-items-center bg-white p-2"><img src={image.url} alt={image.altText || "Ảnh ứng viên sản phẩm"} className="max-h-full max-w-full object-contain" loading="lazy" /></div>
+                <div className="flex flex-col gap-2 border-t border-[var(--border)] p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <select aria-label="Trạng thái ảnh" className="input" value={image.status} disabled={busy !== null} onChange={(e) => void run(`image-status-${image.id}`, () => updateJapanVipContentImage(id, image.id, { status: e.target.value as typeof image.status }))}><option value="pending">Chờ duyệt</option><option value="approved">Duyệt dùng</option><option value="rejected">Loại ảnh</option></select>
+                    <select aria-label="Vai trò ảnh" className="input" value={image.role} disabled={busy !== null} onChange={(e) => void run(`image-role-${image.id}`, () => updateJapanVipContentImage(id, image.id, { role: e.target.value as typeof image.role }))}><option value="hero">Hero</option><option value="main-packshot">Ảnh sản phẩm chính</option><option value="alternate-angle">Góc khác</option><option value="feature">Feature lớn</option><option value="feature-small">Feature nhỏ (gom bảng)</option><option value="detail">Chi tiết</option><option value="dimensions">Kích thước</option><option value="maintenance">Vệ sinh</option></select>
+                  </div>
+                  <input className="input" value={image.intendedSection} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, intendedSection: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-section-${image.id}`, () => updateJapanVipContentImage(id, image.id, { intendedSection: e.target.value }))} placeholder="Phần bài phù hợp, ví dụ: Công nghệ IH" />
+                  {image.role === "feature-small" && <input className="input" value={image.featureGroup} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, featureGroup: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-group-${image.id}`, () => updateJapanVipContentImage(id, image.id, { featureGroup: e.target.value }))} placeholder="Tên bảng gom, ví dụ: 6 công nghệ lõi" />}
+                  <input className="input" value={image.caption} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, caption: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-caption-${image.id}`, () => updateJapanVipContentImage(id, image.id, { caption: e.target.value }))} placeholder="Chú thích giải thích đúng điều ảnh đang chứng minh" />
+                  <input className="input" value={image.altText} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, altText: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-alt-${image.id}`, () => updateJapanVipContentImage(id, image.id, { altText: e.target.value }))} placeholder="Alt text tiếng Việt" />
+                  <div className="flex items-center justify-between gap-2"><span className="truncate text-[11px] text-[var(--text-muted)]">{image.width && image.height ? `${image.width}×${image.height}px` : "Chưa đọc được kích thước"} · {image.sourceType === "official" ? "Nguồn hãng" : image.sourceType}</span><IconButton label="Xóa ảnh" tone="danger" size="sm" disabled={busy !== null} onClick={() => void run(`delete-image-${image.id}`, () => deleteJapanVipContentImage(id, image.id))}><Trash2 size={14} /></IconButton></div>
+                </div>
+              </article>)}
+            </div> : <p className="py-8 text-center text-sm text-[var(--text-muted)]">Chưa có ảnh. Hãy dán trang gallery hoặc feature chính thức của hãng.</p>}
+          </Card>
+        </section>
+
         <section className="scroll-mt-28">
-          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><Brain size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 2</p><h2 className="text-xl font-bold">Ngữ cảnh và bài tham khảo</h2></div></div>
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><Brain size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 3</p><h2 className="text-xl font-bold">Ngữ cảnh và bài tham khảo</h2></div></div>
           <Card
             title="AI học từ bài tham khảo"
             actions={<Link href="/japanvip-content/learning" className="btn btn-secondary btn-sm"><Brain size={14} /> Quản lý thư viện</Link>}
@@ -298,7 +333,7 @@ export default function JapanVipContentDetailPage() {
         </section>
 
         <section className="scroll-mt-28">
-          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><PenTool size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 3</p><h2 className="text-xl font-bold">Không gian biên tập</h2></div></div>
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><PenTool size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 4</p><h2 className="text-xl font-bold">Không gian biên tập</h2></div></div>
           <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(360px,0.75fr)_minmax(0,1.25fr)]">
           <div id="outline" className="scroll-mt-28">
           <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : `${AI_LABEL[draft.aiProvider]} tạo dàn ý`}</Button>}>
@@ -316,7 +351,7 @@ export default function JapanVipContentDetailPage() {
         </section>
 
         <section id="review" className="scroll-mt-28">
-          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><ShieldCheck size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 4</p><h2 className="text-xl font-bold">Kiểm soát chất lượng</h2></div></div>
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><ShieldCheck size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 5</p><h2 className="text-xl font-bold">Kiểm soát chất lượng</h2></div></div>
           <Card title="Hermes chấm điểm & phản biện" actions={<Button small disabled={busy !== null || !draft.article.trim()} onClick={() => void run("hermes-review", () => reviewJapanVipArticleWithHermes(id))}><ShieldCheck size={14} /> {busy === "hermes-review" ? "Hermes đang chấm…" : draft.hermesReviews.length ? "Hermes chấm lại" : "Hermes chấm bài"}</Button>}>
             {draft.hermesReviews.length === 0 ? (
               <p className="py-6 text-center text-sm text-[var(--text-muted)]">Sau khi viết bài, dùng Hermes làm giám khảo độc lập. Nhận xét chưa tự động trở thành quy tắc chung.</p>
@@ -343,7 +378,7 @@ export default function JapanVipContentDetailPage() {
         </section>
 
         <section id="approval" className="scroll-mt-28">
-          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><FileCheck2 size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 5</p><h2 className="text-xl font-bold">Duyệt và ghi nhớ</h2></div></div>
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><FileCheck2 size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 6</p><h2 className="text-xl font-bold">Duyệt và ghi nhớ</h2></div></div>
           <Card title="Duyệt nội dung" actions={draft.status !== "approved" ? <Button small variant="secondary" disabled={busy !== null || !draft.article.trim()} onClick={() => void run("approve", () => updateJapanVipContentProject(id, { status: "approved" }))}><FileCheck2 size={14} /> {busy === "approve" ? "Đang lưu…" : "Đánh dấu đã duyệt"}</Button> : undefined}>
             <Field label="Ghi chú biên tập" htmlFor="jvc-notes">
               <textarea id="jvc-notes" className="input min-h-28 resize-y" value={draft.notes} onChange={(e) => patch("notes", e.target.value)} placeholder="Điểm cần sửa, claim cần kiểm chứng, yêu cầu bổ sung ảnh…" />

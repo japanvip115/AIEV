@@ -11,10 +11,13 @@ import {
   writeJapanVipContent,
   type JapanVipContentProject,
   type JapanVipContentStatus,
+  type JapanVipImageRole,
+  type JapanVipImageStatus,
 } from "../japanVipContent.js";
 import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary } from "../japanVipLearning.js";
 import { askHermesCritic } from "../hermesCritic.js";
+import { discoverJapanVipImages } from "../japanVipImages.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -24,6 +27,20 @@ const STATUSES = new Set<JapanVipContentStatus>([
   "review",
   "approved",
 ]);
+const IMAGE_ROLES = new Set<JapanVipImageRole>(["hero", "main-packshot", "alternate-angle", "feature", "feature-small", "detail", "dimensions", "maintenance"]);
+const IMAGE_STATUSES = new Set<JapanVipImageStatus>(["pending", "approved", "rejected"]);
+
+function imageWritingContext(project: JapanVipContentProject): string {
+  const approved = project.images.filter((image) => image.status === "approved");
+  if (!approved.length) return "Không có ảnh đã duyệt. Không tự chèn URL ảnh khác.";
+  return [
+    "MANIFEST ẢNH ĐÃ DUYỆT (chỉ được dùng các URL này, mỗi URL đúng một lần):",
+    ...approved.map((image) => `- role=${image.role}; section=${image.intendedSection || "tự ghép theo ngữ cảnh"}; group=${image.featureGroup || "none"}; alt=${image.altText}; caption=${image.caption}; url=${image.url}`),
+    "Ảnh hero đặt đầu bài. Ảnh feature/detail/dimensions/maintenance phải đặt sát phần nội dung thực sự giải thích đúng hình.",
+    "Các ảnh role=feature-small phải gom theo group thành một bảng HTML responsive duy nhất cho mỗi group; không rải từng ảnh nhỏ thành các khối riêng.",
+    "Không dùng ảnh pending/rejected, không lặp URL và không suy ra claim chỉ từ hình ảnh.",
+  ].join("\n");
+}
 
 function textList(value: unknown, limit = 12): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, limit) : [];
@@ -196,6 +213,49 @@ router.delete("/:id/sources/:sourceId", (req, res) => {
   res.json(project);
 });
 
+router.post("/:id/images/discover", async (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  const sourceType = body.sourceType === "owned" ? "owned" : body.sourceType === "reference-only" ? "reference-only" : "official";
+  if (!url) throw new HttpError(400, "INVALID_IMAGE_SOURCE", "Thiếu URL trang ảnh của hãng");
+  const discovered = await discoverJapanVipImages(url);
+  const existing = new Set(project.images.map((image) => image.url));
+  for (const image of discovered.images) {
+    if (existing.has(image.url)) continue;
+    project.images.push({
+      id: nanoid(10), url: image.url, sourcePageUrl: discovered.pageUrl, sourceType,
+      rightsBasis: sourceType === "official" ? "admin-attested-authorized-reseller" : sourceType === "owned" ? "business-owned" : "reference-only",
+      status: "pending", role: "feature", altText: image.alt.slice(0, 180), caption: "", intendedSection: "", featureGroup: "",
+      width: image.width, height: image.height, discoveredAt: nowIso(),
+    });
+  }
+  project.images = project.images.slice(0, 240);
+  writeJapanVipContent(project);
+  res.status(201).json(project);
+});
+
+router.patch("/:id/images/:imageId", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const image = project.images.find((item) => item.id === req.params.imageId);
+  if (!image) throw new HttpError(404, "IMAGE_NOT_FOUND", "Không tìm thấy ảnh trong project");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.status === "string" && IMAGE_STATUSES.has(body.status as JapanVipImageStatus)) image.status = body.status as JapanVipImageStatus;
+  if (typeof body.role === "string" && IMAGE_ROLES.has(body.role as JapanVipImageRole)) image.role = body.role as JapanVipImageRole;
+  for (const key of ["altText", "caption", "intendedSection", "featureGroup"] as const) if (typeof body[key] === "string") image[key] = body[key].trim().slice(0, 500);
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
+router.delete("/:id/images/:imageId", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const next = project.images.filter((item) => item.id !== req.params.imageId);
+  if (next.length === project.images.length) throw new HttpError(404, "IMAGE_NOT_FOUND", "Không tìm thấy ảnh trong project");
+  project.images = next;
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
 router.post("/:id/feedback", (req, res) => {
   const project = readJapanVipContent(req.params.id);
   const body = (req.body ?? {}) as Record<string, unknown>;
@@ -229,6 +289,7 @@ router.post("/:id/generate-outline", async (req, res) => {
     "Nguồn chính thức và fact sheet là nguồn DUY NHẤT cho dữ kiện sản phẩm. Bài tham khảo chỉ dùng để học cách tổ chức và diễn đạt.",
     "Trả JSON thuần: {\"outline\": \"dàn ý Markdown với H2/H3\"}.",
     japanVipLearningContext(project.selectedReferenceIds),
+    imageWritingContext(project),
     researchContext(project),
   ].join("\n\n");
   const ai = await generateJapanVipText(project.aiProvider, { prompt, usageTag: "japanvip-outline", projectId: project.id });
@@ -255,6 +316,7 @@ router.post("/:id/generate-article", async (req, res) => {
     "Xuất Markdown thuần, không bọc code fence, không giải thích thêm.",
     `DÀN Ý:\n${project.outline}`,
     japanVipLearningContext(project.selectedReferenceIds),
+    imageWritingContext(project),
     researchContext(project),
   ].join("\n\n");
   const ai = await generateJapanVipText(project.aiProvider, {

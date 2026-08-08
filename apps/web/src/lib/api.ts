@@ -2947,6 +2947,22 @@ export interface JapanVipContentProject {
     criteria: Array<{ key: string; label: string; score: number; maxScore: number; feedback: string }>;
     createdAt: string;
   }>;
+  images: Array<{
+    id: string;
+    url: string;
+    sourcePageUrl: string;
+    sourceType: "official" | "owned" | "reference-only";
+    rightsBasis: string;
+    status: "pending" | "approved" | "rejected";
+    role: "hero" | "main-packshot" | "alternate-angle" | "feature" | "feature-small" | "detail" | "dimensions" | "maintenance";
+    altText: string;
+    caption: string;
+    intendedSection: string;
+    featureGroup: string;
+    width: number | null;
+    height: number | null;
+    discoveredAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -3019,6 +3035,15 @@ export const reviewJapanVipArticleWithHermes = (id: string) =>
 
 export const reviseJapanVipArticleFromHermes = (id: string) =>
   post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/revise-from-hermes`);
+
+export const discoverJapanVipContentImages = (id: string, url: string, sourceType: "official" | "owned" | "reference-only" = "official") =>
+  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/images/discover`, { url, sourceType });
+
+export const updateJapanVipContentImage = (id: string, imageId: string, patch: Partial<JapanVipContentProject["images"][number]>) =>
+  jsonBody<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/images/${encodeURIComponent(imageId)}`, "PATCH", patch);
+
+export const deleteJapanVipContentImage = (id: string, imageId: string) =>
+  request<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/images/${encodeURIComponent(imageId)}`, { method: "DELETE" });
 
 export interface JapanVipStyleAnalysis {
   summary: string;

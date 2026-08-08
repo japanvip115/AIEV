@@ -53,6 +53,26 @@ export interface JapanVipHermesReview {
   createdAt: string;
 }
 
+export type JapanVipImageRole = "hero" | "main-packshot" | "alternate-angle" | "feature" | "feature-small" | "detail" | "dimensions" | "maintenance";
+export type JapanVipImageStatus = "pending" | "approved" | "rejected";
+
+export interface JapanVipContentImage {
+  id: string;
+  url: string;
+  sourcePageUrl: string;
+  sourceType: "official" | "owned" | "reference-only";
+  rightsBasis: string;
+  status: JapanVipImageStatus;
+  role: JapanVipImageRole;
+  altText: string;
+  caption: string;
+  intendedSection: string;
+  featureGroup: string;
+  width: number | null;
+  height: number | null;
+  discoveredAt: string;
+}
+
 export interface JapanVipContentProject {
   id: string;
   name: string;
@@ -70,6 +90,7 @@ export interface JapanVipContentProject {
   notes: string;
   feedback: JapanVipContentFeedback[];
   hermesReviews: JapanVipHermesReview[];
+  images: JapanVipContentImage[];
   createdAt: string;
   updatedAt: string;
 }
@@ -81,6 +102,7 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
     feedback: Array.isArray(project.feedback) ? project.feedback : [],
     hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
+    images: Array.isArray(project.images) ? project.images : [],
   };
 }
 
@@ -158,6 +180,7 @@ export function createJapanVipContent(input: {
     notes: "",
     feedback: [],
     hermesReviews: [],
+    images: [],
     createdAt: now,
     updatedAt: now,
   };
