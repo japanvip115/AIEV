@@ -1193,7 +1193,7 @@ POST   /api/japanvip-content/:id/feedback            { category, note, saveAsRul
 
 - Nguồn URL đi qua cùng lớp `safeFetchHtml` và Readability của Text to video.
 - Fact sheet do người dùng nhập/duyệt là nguồn sự thật ưu tiên cho AI.
-- AI tạo dàn ý và bài Markdown bằng một lượt Claude không có tool; claim thiếu bằng chứng phải giữ
+- AI tạo dàn ý và bài Markdown bằng Codex CLI dùng phiên ChatGPT hiện tại; claim thiếu bằng chứng phải giữ
   nhãn `[CẦN KIỂM CHỨNG]`.
 - MVP không có endpoint xuất bản CMS. Trạng thái `approved` chỉ ghi nhận đã duyệt nội bộ.
 
@@ -1210,7 +1210,7 @@ DELETE /api/japanvip-learning/rules/:ruleId
 ```
 
 - `kind`: `competitor`, `inspiration` hoặc `japanvip`.
-- AI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận
+- GPT qua Codex CLI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận
   claim sản phẩm và không được sao chép câu chữ.
 - Project chọn bài mẫu qua `selectedReferenceIds`. Dữ kiện sản phẩm vẫn chỉ lấy từ nguồn chính thức
   và fact sheet đã duyệt.

@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
 import { Router } from "express";
 import { extractArticleFromUrl } from "../article.js";
-import { extractJson, generateText } from "../aiText.js";
+import { extractJson } from "../aiText.js";
+import { generateCodexText } from "../codexText.js";
 import {
   addJapanVipLearningRule,
   normalizeStyleAnalysis,
@@ -54,7 +55,7 @@ router.post("/articles", async (req, res) => {
     `LOẠI TÀI LIỆU: ${kind}`,
     `NỘI DUNG:\n${text.slice(0, 24_000)}`,
   ].join("\n\n");
-  const ai = await generateText({ prompt, usageTag: "japanvip-learn" });
+  const ai = await generateCodexText({ prompt, usageTag: "japanvip-learn" });
   const parsed = extractJson<Record<string, unknown>>(ai.text);
   if (!parsed) throw new HttpError(502, "REFERENCE_ANALYSIS_FAILED", "AI không trả về phân tích bài viết hợp lệ");
   const now = nowIso();

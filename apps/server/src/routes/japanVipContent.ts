@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
 import { Router } from "express";
 import { extractArticleFromUrl } from "../article.js";
-import { extractJson, generateText } from "../aiText.js";
+import { extractJson } from "../aiText.js";
+import { generateCodexText } from "../codexText.js";
 import {
   createJapanVipContent,
   deleteJapanVipContent,
@@ -176,7 +177,7 @@ router.post("/:id/generate-outline", async (req, res) => {
     japanVipLearningContext(project.selectedReferenceIds),
     researchContext(project),
   ].join("\n\n");
-  const ai = await generateText({ prompt, usageTag: "japanvip-outline", projectId: project.id });
+  const ai = await generateCodexText({ prompt, usageTag: "japanvip-outline", projectId: project.id });
   const parsed = extractJson<{ outline?: unknown }>(ai.text);
   if (!parsed || typeof parsed.outline !== "string" || !parsed.outline.trim()) {
     throw new HttpError(502, "OUTLINE_PARSE_FAILED", "AI không trả về dàn ý hợp lệ");
@@ -202,7 +203,7 @@ router.post("/:id/generate-article", async (req, res) => {
     japanVipLearningContext(project.selectedReferenceIds),
     researchContext(project),
   ].join("\n\n");
-  const ai = await generateText({
+  const ai = await generateCodexText({
     prompt,
     usageTag: "japanvip-article",
     projectId: project.id,
