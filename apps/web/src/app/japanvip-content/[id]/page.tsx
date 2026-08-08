@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Brain, ExternalLink, FileCheck2, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
+import { ArrowLeft, Brain, CheckCircle2, Database, ExternalLink, FileCheck2, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -71,6 +71,15 @@ export default function JapanVipContentDetailPage() {
   useEffect(() => void load(), [load]);
 
   const dirty = useMemo(() => JSON.stringify(project) !== JSON.stringify(draft), [project, draft]);
+  const workflow = useMemo(() => draft ? [
+    { label: "Nghiên cứu", href: "#research", done: draft.sources.length > 0 || draft.facts.length > 0 },
+    { label: "Dàn ý", href: "#outline", done: Boolean(draft.outline.trim()) },
+    { label: "Bài viết", href: "#article", done: Boolean(draft.article.trim()) },
+    { label: "Phản biện", href: "#review", done: draft.hermesReviews.length > 0 },
+    { label: "Duyệt", href: "#approval", done: draft.status === "approved" },
+  ] : [], [draft]);
+  const completedSteps = workflow.filter((step) => step.done).length;
+  const articleWords = draft?.article.trim() ? draft.article.trim().split(/\s+/).length : 0;
 
   function patch<K extends keyof JapanVipContentProject>(key: K, value: JapanVipContentProject[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
@@ -128,7 +137,7 @@ export default function JapanVipContentDetailPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6 pb-10">
       <PageHeader
         title={draft.name}
         subtitle={`${draft.productModel || "Chưa có model"} · ${draft.sources.length} nguồn · ${draft.facts.length} fact`}
@@ -136,14 +145,40 @@ export default function JapanVipContentDetailPage() {
           <>
             <Link href="/japanvip-content" className="btn btn-secondary"><ArrowLeft size={15} /> Danh sách</Link>
             <Badge tone={STATUS[draft.status].tone} label={STATUS[draft.status].label} />
-            <Button disabled={!dirty || busy !== null} onClick={() => void save()}><Save size={15} /> Lưu</Button>
           </>
         }
       />
       {error && <ErrorBanner message="Thao tác chưa hoàn tất" detail={error} />}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div className="sticky top-2 z-20 rounded-[calc(var(--radius)+4px)] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] p-3 shadow-lg backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label="Tiến độ sản xuất nội dung" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            {workflow.map((step, index) => (
+              <a key={step.label} href={step.href} className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition ${step.done ? "bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]" : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]"}`}>
+                <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${step.done ? "bg-[var(--primary)] text-white" : "border border-[var(--border)]"}`}>{step.done ? <CheckCircle2 size={13} /> : index + 1}</span>
+                {step.label}
+              </a>
+            ))}
+          </nav>
+          <div className="flex items-center gap-2">
+            {dirty && <span className="hidden text-xs font-medium text-amber-600 sm:inline">Có thay đổi chưa lưu</span>}
+            <Button disabled={!dirty || busy !== null} onClick={() => void save()}><Save size={15} /> {busy === "save" ? "Đang lưu…" : "Lưu thay đổi"}</Button>
+          </div>
+        </div>
+      </div>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng quan dự án">
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Tiến độ</p><p className="mt-2 text-2xl font-bold">{completedSteps}/5</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${completedSteps * 20}%` }} /></div></div>
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Dữ liệu đã khóa</p><p className="mt-2 text-2xl font-bold">{draft.sources.length} <span className="text-sm font-medium text-[var(--text-muted)]">nguồn</span> · {draft.facts.length} <span className="text-sm font-medium text-[var(--text-muted)]">fact</span></p></div>
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">AI sản xuất</p><p className="mt-2 text-lg font-bold">{AI_LABEL[draft.aiProvider]}</p><p className="mt-1 text-xs text-[var(--text-muted)]">Áp dụng cho dàn ý và bài viết</p></div>
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Bản thảo</p><p className="mt-2 text-2xl font-bold">{articleWords.toLocaleString("vi-VN")} <span className="text-sm font-medium text-[var(--text-muted)]">từ</span></p><p className="mt-1 text-xs text-[var(--text-muted)]">Hermes: {draft.hermesReviews[0] ? `${draft.hermesReviews[0].totalScore}/100` : "chưa chấm"}</p></div>
+      </section>
+
+      <div className="flex min-w-0 flex-col gap-8">
+        <section id="research" className="scroll-mt-28">
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><Database size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 1</p><h2 className="text-xl font-bold">Thiết lập và khóa dữ liệu</h2></div></div>
+          <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+          <div className="xl:col-span-2">
           <Card title="Thông tin sản phẩm">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Tên sản phẩm" htmlFor="jvc-name">
@@ -175,6 +210,7 @@ export default function JapanVipContentDetailPage() {
               <input id="jvc-audience" className="input" value={draft.audience} onChange={(e) => patch("audience", e.target.value)} />
             </Field>
           </Card>
+          </div>
 
           <Card title="Nguồn chính thức" actions={<span className="text-meta text-[var(--text-muted)]">{draft.sources.length} nguồn</span>}>
             <div className="mb-3 flex gap-2">
@@ -208,9 +244,11 @@ export default function JapanVipContentDetailPage() {
               <textarea id="jvc-facts" className="input min-h-52 resize-y" value={draft.facts.join("\n")} onChange={(e) => patch("facts", e.target.value.split("\n"))} placeholder="Dung tích 1,0 lít\nĐiện áp 100V Nhật Bản\nMàu BZ: đen" />
             </Field>
           </Card>
-        </div>
+          </div>
+        </section>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <section className="scroll-mt-28">
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><Brain size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 2</p><h2 className="text-xl font-bold">Ngữ cảnh và bài tham khảo</h2></div></div>
           <Card
             title="AI học từ bài tham khảo"
             actions={<Link href="/japanvip-content/learning" className="btn btn-secondary btn-sm"><Brain size={14} /> Quản lý thư viện</Link>}
@@ -243,15 +281,28 @@ export default function JapanVipContentDetailPage() {
               )}
             </div>
           </Card>
+        </section>
 
+        <section className="scroll-mt-28">
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><PenTool size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 3</p><h2 className="text-xl font-bold">Không gian biên tập</h2></div></div>
+          <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(360px,0.75fr)_minmax(0,1.25fr)]">
+          <div id="outline" className="scroll-mt-28">
           <Card title="Dàn ý SEO" actions={<Button small disabled={busy !== null || (draft.sources.length === 0 && draft.facts.length === 0)} onClick={() => void run("outline", () => generateJapanVipOutline(id))}><Sparkles size={14} /> {busy === "outline" ? "Đang tạo…" : `${AI_LABEL[draft.aiProvider]} tạo dàn ý`}</Button>}>
-            <textarea className="input min-h-72 resize-y font-mono text-sm" value={draft.outline} onChange={(e) => patch("outline", e.target.value)} placeholder="## Tổng quan sản phẩm…" />
+            <textarea className="input min-h-[520px] resize-y font-mono text-sm leading-6" value={draft.outline} onChange={(e) => patch("outline", e.target.value)} placeholder="## Tổng quan sản phẩm…" />
           </Card>
+          </div>
 
+          <div id="article" className="scroll-mt-28">
           <Card title="Bài viết Markdown" actions={<Button small disabled={busy !== null || !draft.outline.trim()} onClick={() => void run("article", () => generateJapanVipArticle(id))}><Sparkles size={14} /> {busy === "article" ? "Đang viết…" : `${AI_LABEL[draft.aiProvider]} viết bài`}</Button>}>
-            <textarea className="input min-h-[560px] resize-y font-mono text-sm leading-6" value={draft.article} onChange={(e) => patch("article", e.target.value)} placeholder="Bài viết hoàn chỉnh sẽ xuất hiện tại đây…" />
+            <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-muted)]"><span>Bản thảo làm việc</span><span>{articleWords.toLocaleString("vi-VN")} từ</span></div>
+            <textarea className="input min-h-[520px] resize-y font-mono text-sm leading-6" value={draft.article} onChange={(e) => patch("article", e.target.value)} placeholder="Bài viết hoàn chỉnh sẽ xuất hiện tại đây…" />
           </Card>
+          </div>
+          </div>
+        </section>
 
+        <section id="review" className="scroll-mt-28">
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><ShieldCheck size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 4</p><h2 className="text-xl font-bold">Kiểm soát chất lượng</h2></div></div>
           <Card title="Hermes chấm điểm & phản biện" actions={<Button small disabled={busy !== null || !draft.article.trim()} onClick={() => void run("hermes-review", () => reviewJapanVipArticleWithHermes(id))}><ShieldCheck size={14} /> {busy === "hermes-review" ? "Hermes đang chấm…" : draft.hermesReviews.length ? "Hermes chấm lại" : "Hermes chấm bài"}</Button>}>
             {draft.hermesReviews.length === 0 ? (
               <p className="py-6 text-center text-sm text-[var(--text-muted)]">Sau khi viết bài, dùng Hermes làm giám khảo độc lập. Nhận xét chưa tự động trở thành quy tắc chung.</p>
@@ -275,7 +326,10 @@ export default function JapanVipContentDetailPage() {
               </div>;
             })()}
           </Card>
+        </section>
 
+        <section id="approval" className="scroll-mt-28">
+          <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><FileCheck2 size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 5</p><h2 className="text-xl font-bold">Duyệt và ghi nhớ</h2></div></div>
           <Card title="Duyệt nội dung" actions={draft.status !== "approved" ? <Button small variant="secondary" disabled={busy !== null || !draft.article.trim()} onClick={() => void run("approve", () => updateJapanVipContentProject(id, { status: "approved" }))}><FileCheck2 size={14} /> {busy === "approve" ? "Đang lưu…" : "Đánh dấu đã duyệt"}</Button> : undefined}>
             <Field label="Ghi chú biên tập" htmlFor="jvc-notes">
               <textarea id="jvc-notes" className="input min-h-28 resize-y" value={draft.notes} onChange={(e) => patch("notes", e.target.value)} placeholder="Điểm cần sửa, claim cần kiểm chứng, yêu cầu bổ sung ảnh…" />
@@ -318,7 +372,7 @@ export default function JapanVipContentDetailPage() {
               )}
             </div>
           </Card>
-        </div>
+        </section>
       </div>
     </div>
   );
