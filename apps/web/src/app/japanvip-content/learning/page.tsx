@@ -34,6 +34,7 @@ const AI_LABEL: Record<JapanVipAiProvider, string> = {
   codex: "ChatGPT",
   claude: "Claude",
   ollama: "Ollama Local",
+  "ollama-cloud": "Ollama Cloud",
 };
 
 export default function JapanVipLearningPage() {
@@ -96,6 +97,7 @@ export default function JapanVipLearningPage() {
             <option value="codex">ChatGPT (Codex CLI)</option>
             <option value="claude">Claude Code</option>
             <option value="ollama">Ollama Local (qwen3:14b)</option>
+            <option value="ollama-cloud">Ollama Cloud (GPT-OSS 120B)</option>
           </select>
           <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Nồi cơm, mở bài, SEO…" />
           <Button disabled={!url.trim() || busy !== null} onClick={() => void run("add-article", async () => {
@@ -109,6 +111,11 @@ export default function JapanVipLearningPage() {
           Ollama: {aiStatus?.ollama.running
             ? aiStatus.ollama.installed ? `Sẵn sàng · ${aiStatus.ollama.model}` : `Đang chạy nhưng thiếu ${aiStatus.ollama.model}`
             : "Chưa chạy"}
+        </p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Ollama Cloud: {aiStatus?.ollamaCloud.running && aiStatus.ollamaCloud.available
+            ? `Sẵn sàng · ${aiStatus.ollamaCloud.model}`
+            : aiStatus?.ollamaCloud.error || "Chưa sẵn sàng"}
         </p>
       </Card>
 

@@ -13,6 +13,7 @@ import {
 } from "../japanVipLearning.js";
 import { HttpError, nowIso } from "../util.js";
 import { getOllamaStatus } from "../ollamaText.js";
+import { getOllamaCloudStatus } from "../ollamaCloudText.js";
 
 const router = Router();
 const KINDS = new Set<JapanVipReferenceKind>(["competitor", "inspiration", "japanvip"]);
@@ -32,7 +33,10 @@ function cleanTags(value: unknown): string[] {
 }
 
 router.get("/", (_req, res) => res.json(publicLibrary()));
-router.get("/ai-status", async (_req, res) => res.json({ ollama: await getOllamaStatus() }));
+router.get("/ai-status", async (_req, res) => {
+  const [ollama, ollamaCloud] = await Promise.all([getOllamaStatus(), getOllamaCloudStatus()]);
+  res.json({ ollama, ollamaCloud });
+});
 
 router.post("/articles", async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;

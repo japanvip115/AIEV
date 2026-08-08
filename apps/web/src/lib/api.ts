@@ -2898,7 +2898,7 @@ export type JapanVipContentStatus =
   | "review"
   | "approved";
 
-export type JapanVipAiProvider = "codex" | "claude" | "ollama";
+export type JapanVipAiProvider = "codex" | "claude" | "ollama" | "ollama-cloud";
 
 export interface JapanVipSource {
   id: string;
@@ -3097,6 +3097,7 @@ export const getJapanVipLearningLibrary = () =>
 
 export interface JapanVipAiStatus {
   ollama: { running: boolean; model: string; installed: boolean; models: string[] };
+  ollamaCloud: { configured: boolean; running: boolean; model: string; available: boolean; models: string[]; error?: string };
 }
 
 export const getJapanVipAiStatus = () =>

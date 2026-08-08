@@ -44,6 +44,7 @@ const AI_LABEL: Record<JapanVipAiProvider, string> = {
   codex: "ChatGPT",
   claude: "Claude",
   ollama: "Ollama Local",
+  "ollama-cloud": "Ollama Cloud",
 };
 
 export default function JapanVipContentDetailPage() {
@@ -180,6 +181,7 @@ export default function JapanVipContentDetailPage() {
                 <option value="codex">ChatGPT (Codex CLI)</option>
                 <option value="claude">Claude Code</option>
                 <option value="ollama">Ollama Local (qwen3:14b)</option>
+                <option value="ollama-cloud">Ollama Cloud (GPT-OSS 120B)</option>
               </select>
             </label>
             <Button disabled={!dirty || busy !== null} onClick={() => void save()}><Save size={15} /> {busy === "save" ? "Đang lưu…" : "Lưu thay đổi"}</Button>
@@ -223,6 +225,7 @@ export default function JapanVipContentDetailPage() {
                   <option value="codex">ChatGPT (Codex CLI)</option>
                   <option value="claude">Claude Code</option>
                   <option value="ollama">Ollama Local (qwen3:14b)</option>
+                  <option value="ollama-cloud">Ollama Cloud (GPT-OSS 120B)</option>
                 </select>
               </Field>
             </div>

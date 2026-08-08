@@ -99,7 +99,7 @@ export interface JapanVipContentProject {
 function normalizeProject(project: JapanVipContentProject): JapanVipContentProject {
   return {
     ...project,
-    aiProvider: project.aiProvider === "claude" || project.aiProvider === "ollama" ? project.aiProvider : "codex",
+    aiProvider: project.aiProvider === "claude" || project.aiProvider === "ollama" || project.aiProvider === "ollama-cloud" ? project.aiProvider : "codex",
     selectedReferenceIds: Array.isArray(project.selectedReferenceIds) ? project.selectedReferenceIds : [],
     feedback: Array.isArray(project.feedback) ? project.feedback.map((item) => ({ ...item, ruleId: typeof item.ruleId === "string" ? item.ruleId : null })) : [],
     hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
