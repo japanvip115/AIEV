@@ -1202,12 +1202,18 @@ POST   /api/japanvip-content/:id/feedback            { category, note, saveAsRul
 ```text
 GET    /api/japanvip-learning
 POST   /api/japanvip-learning/articles               { url, kind, tags? }
+POST   /api/japanvip-learning/japanvip-articles       { url, tags? }
+POST   /api/japanvip-learning/articles/:articleId/hermes-review
+POST   /api/japanvip-learning/articles/:articleId/approve
+POST   /api/japanvip-learning/articles/:articleId/reject
 PATCH  /api/japanvip-learning/articles/:articleId
 DELETE /api/japanvip-learning/articles/:articleId
 POST   /api/japanvip-learning/rules                  { text }
 PATCH  /api/japanvip-learning/rules/:ruleId
 DELETE /api/japanvip-learning/rules/:ruleId
 ```
+
+Bài nhập qua `japanvip-articles` phải thuộc tên miền `japanvip.vn`, được Hermes chấm 6 tiêu chí và mặc định ở trạng thái chờ duyệt. API `approve` chỉ chấp nhận khi tổng điểm từ 85/100 và tiêu chí độ chính xác từ 80/100; bài đã duyệt được tự động ưu tiên làm nguồn phong cách nội bộ, nhưng không thay thế nguồn hãng cho thông số/claim sản phẩm.
 
 - `kind`: `competitor`, `inspiration` hoặc `japanvip`.
 - GPT qua Codex CLI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận

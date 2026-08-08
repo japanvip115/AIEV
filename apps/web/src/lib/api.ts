@@ -3094,6 +3094,18 @@ export interface JapanVipReferenceArticle {
   tags: string[];
   text: string;
   analysis: JapanVipStyleAnalysis;
+  hermesReview: {
+    totalScore: number;
+    accuracyScore: number;
+    verdict: "needs_work" | "good" | "excellent";
+    summary: string;
+    strengths: string[];
+    issues: string[];
+    criteria: Array<{ key: string; label: string; score: number; maxScore: number; feedback: string }>;
+    createdAt: string;
+  } | null;
+  approvalStatus: "pending" | "approved" | "rejected";
+  approvedAt: string | null;
   active: boolean;
   fetchedAt: string;
   createdAt: string;
@@ -3133,6 +3145,18 @@ export const addJapanVipReferenceArticle = (input: {
   tags?: string[];
   aiProvider?: JapanVipAiProvider;
 }) => post<JapanVipLearningLibrary>("/api/japanvip-learning/articles", input);
+
+export const addJapanVipOwnedArticle = (input: { url: string; tags?: string[] }) =>
+  post<JapanVipLearningLibrary>("/api/japanvip-learning/japanvip-articles", input);
+
+export const reviewJapanVipOwnedArticle = (id: string) =>
+  post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/hermes-review`);
+
+export const approveJapanVipOwnedArticle = (id: string) =>
+  post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/approve`);
+
+export const rejectJapanVipOwnedArticle = (id: string) =>
+  post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/reject`);
 
 export const updateJapanVipReferenceArticle = (
   id: string,

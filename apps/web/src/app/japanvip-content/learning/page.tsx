@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookOpenCheck, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, CheckCircle2, ExternalLink, Plus, RotateCcw, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
@@ -11,11 +11,15 @@ import { IconButton } from "@/components/IconButton";
 import { PageHeader } from "@/components/PageHeader";
 import {
   addJapanVipLearningRule,
+  addJapanVipOwnedArticle,
   addJapanVipReferenceArticle,
+  approveJapanVipOwnedArticle,
   deleteJapanVipLearningRule,
   deleteJapanVipReferenceArticle,
   getJapanVipLearningLibrary,
   getJapanVipAiStatus,
+  rejectJapanVipOwnedArticle,
+  reviewJapanVipOwnedArticle,
   updateJapanVipLearningRule,
   updateJapanVipReferenceArticle,
   type JapanVipLearningLibrary,
@@ -41,6 +45,8 @@ export default function JapanVipLearningPage() {
   const [library, setLibrary] = useState<JapanVipLearningLibrary | null>(null);
   const [aiStatus, setAiStatus] = useState<JapanVipAiStatus | null>(null);
   const [url, setUrl] = useState("");
+  const [ownedUrl, setOwnedUrl] = useState("");
+  const [ownedTags, setOwnedTags] = useState("");
   const [kind, setKind] = useState<JapanVipReferenceKind>("competitor");
   const [aiProvider, setAiProvider] = useState<JapanVipAiProvider>("codex");
   const [tags, setTags] = useState("");
@@ -84,6 +90,23 @@ export default function JapanVipLearningPage() {
       />
       {error && <ErrorBanner message="Thao tác chưa hoàn tất" detail={error} />}
 
+      <Card title="Chấm bài đã xuất bản trên JapanVIP" actions={<Badge tone="success" label="Nguồn nội bộ" />}>
+        <p className="mb-3 text-sm text-[var(--text-muted)]">
+          Dán URL bài trên japanvip.vn. Hermes sẽ chấm 6 tiêu chí; bài chỉ được duyệt làm nguồn học khi tổng điểm ≥85 và độ chính xác ≥80.
+        </p>
+        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_240px_auto]">
+          <input className="input" value={ownedUrl} onChange={(e) => setOwnedUrl(e.target.value)} placeholder="https://japanvip.vn/bai-viet/..." />
+          <input className="input" value={ownedTags} onChange={(e) => setOwnedTags(e.target.value)} placeholder="Nồi cơm, bài tư vấn…" />
+          <Button disabled={!ownedUrl.trim() || busy !== null} onClick={() => void run("add-owned", async () => {
+            const next = await addJapanVipOwnedArticle({ url: ownedUrl.trim(), tags: ownedTags.split(",").map((tag) => tag.trim()).filter(Boolean) });
+            setOwnedUrl("");
+            setOwnedTags("");
+            return next;
+          })}><ShieldCheck size={15} /> {busy === "add-owned" ? "Hermes đang chấm…" : "Nhập và chấm bằng Hermes"}</Button>
+        </div>
+        <p className="mt-3 text-xs text-[var(--text-muted)]">Bài đạt điểm vẫn cần bạn bấm duyệt. Nội dung được dùng để học cách viết, không tự trở thành nguồn xác thực thông số sản phẩm.</p>
+      </Card>
+
       <Card title="Thêm bài viết cần học" actions={<Badge tone="muted" label="Không dùng làm nguồn sự thật" />}>
         <p className="mb-3 text-sm text-[var(--text-muted)]">
           AI sẽ bóc tách cách trình bày, bố cục và kỹ thuật thuyết phục. Hệ thống không được sao chép câu chữ hoặc lấy claim sản phẩm từ bài này.
@@ -91,7 +114,7 @@ export default function JapanVipLearningPage() {
         <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_170px_190px_210px_auto]">
           <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Dán URL bài đối thủ hoặc bài cần học…" />
           <select className="input" value={kind} onChange={(e) => setKind(e.target.value as JapanVipReferenceKind)}>
-            {Object.entries(KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {(Object.entries(KIND_LABEL) as Array<[JapanVipReferenceKind, string]>).filter(([value]) => value !== "japanvip").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select className="input" aria-label="AI phân tích" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as JapanVipAiProvider)}>
             <option value="codex">ChatGPT (Codex CLI)</option>
@@ -122,23 +145,27 @@ export default function JapanVipLearningPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <Card title="Thư viện bài tham khảo">
           <div className="flex flex-col gap-3">
-            {library.articles.map((article) => (
+            {library.articles.map((article) => {
+              const review = article.hermesReview;
+              const passesGate = Boolean(review && review.totalScore >= 85 && review.accuracyScore >= 80);
+              return (
               <div key={article.id} className="rounded-[var(--radius)] border border-[var(--border)] p-4">
                 <div className="flex items-start gap-3">
-                  <input
+                  {article.kind !== "japanvip" ? <input
                     className="mt-1 h-4 w-4 accent-[var(--primary)]"
                     type="checkbox"
                     checked={article.active}
                     aria-label={`Bật ${article.title}`}
                     disabled={busy !== null}
                     onChange={(e) => void run(`article-${article.id}`, () => updateJapanVipReferenceArticle(article.id, { active: e.target.checked }))}
-                  />
+                  /> : <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${article.approvalStatus === "approved" ? "bg-emerald-100 text-emerald-700" : article.approvalStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{article.approvalStatus === "approved" ? <CheckCircle2 size={15} /> : article.approvalStatus === "rejected" ? <XCircle size={15} /> : <ShieldCheck size={15} />}</span>}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <a href={article.canonicalUrl ?? article.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-[var(--primary)]">
                         {article.title} <ExternalLink size={13} />
                       </a>
                       <Badge tone={article.kind === "japanvip" ? "success" : "muted"} label={KIND_LABEL[article.kind]} />
+                      {article.kind === "japanvip" && <Badge tone={article.approvalStatus === "approved" ? "success" : article.approvalStatus === "rejected" ? "danger" : "running"} label={article.approvalStatus === "approved" ? "Đã duyệt làm nguồn" : article.approvalStatus === "rejected" ? "Đã loại" : "Chờ duyệt"} />}
                     </div>
                     <p className="mt-1 text-meta text-[var(--text-muted)]">{article.siteName || "Nguồn web"} · {article.tags.join(", ") || "chưa gắn nhãn"}</p>
                     {article.analysis.reusableLessons.length > 0 && (
@@ -164,13 +191,29 @@ export default function JapanVipLearningPage() {
                       <span className="font-medium text-[var(--text)]">Tóm tắt cách viết: </span>
                       {article.analysis.summary || "Chưa có tóm tắt phong cách."}
                     </p>
+                    {article.kind === "japanvip" && review && (
+                      <div className="mt-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-baseline gap-2"><span className={`text-2xl font-bold ${passesGate ? "text-emerald-600" : "text-amber-600"}`}>{review.totalScore}/100</span><span className="text-xs text-[var(--text-muted)]">Độ chính xác {review.accuracyScore}/100</span></div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`review-${article.id}`, () => reviewJapanVipOwnedArticle(article.id))}><RotateCcw size={13} /> Chấm lại</Button>
+                            {article.approvalStatus !== "rejected" && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`reject-${article.id}`, () => rejectJapanVipOwnedArticle(article.id))}><XCircle size={13} /> Loại</Button>}
+                            {article.approvalStatus !== "approved" && <Button small disabled={busy !== null || !passesGate} title={!passesGate ? "Cần tổng ≥85 và độ chính xác ≥80" : undefined} onClick={() => void run(`approve-${article.id}`, () => approveJapanVipOwnedArticle(article.id))}><CheckCircle2 size={13} /> Duyệt làm nguồn</Button>}
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                          {review.criteria.map((criterion) => <div key={criterion.key} className="rounded-[var(--radius)] bg-[var(--surface)] p-2.5"><div className="flex items-center justify-between gap-2 text-xs font-semibold"><span>{criterion.label}</span><span>{criterion.score}/100</span></div><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{criterion.feedback}</p></div>)}
+                        </div>
+                        {review.issues.length > 0 && <details className="mt-3"><summary className="cursor-pointer text-sm font-medium text-amber-700">Điểm cần cải thiện ({review.issues.length})</summary><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--text-muted)]">{review.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></details>}
+                      </div>
+                    )}
                   </div>
                   <IconButton label="Xóa bài tham khảo" tone="danger" size="sm" disabled={busy !== null} onClick={() => void run(`delete-${article.id}`, () => deleteJapanVipReferenceArticle(article.id))}>
                     <Trash2 size={14} />
                   </IconButton>
                 </div>
               </div>
-            ))}
+            );})}
             {library.articles.length === 0 && <p className="py-8 text-center text-sm text-[var(--text-muted)]">Chưa có bài tham khảo. Hãy thêm những bài bạn thực sự đánh giá cao.</p>}
           </div>
         </Card>

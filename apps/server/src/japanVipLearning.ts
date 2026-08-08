@@ -18,6 +18,25 @@ export interface JapanVipStyleAnalysis {
   avoidCopying: string[];
 }
 
+export interface JapanVipLearningReviewCriterion {
+  key: string;
+  label: string;
+  score: number;
+  maxScore: number;
+  feedback: string;
+}
+
+export interface JapanVipLearningReview {
+  totalScore: number;
+  accuracyScore: number;
+  verdict: "needs_work" | "good" | "excellent";
+  summary: string;
+  strengths: string[];
+  issues: string[];
+  criteria: JapanVipLearningReviewCriterion[];
+  createdAt: string;
+}
+
 export interface JapanVipReferenceArticle {
   id: string;
   kind: JapanVipReferenceKind;
@@ -28,6 +47,9 @@ export interface JapanVipReferenceArticle {
   tags: string[];
   text: string;
   analysis: JapanVipStyleAnalysis;
+  hermesReview: JapanVipLearningReview | null;
+  approvalStatus: "pending" | "approved" | "rejected";
+  approvedAt: string | null;
   active: boolean;
   fetchedAt: string;
   createdAt: string;
@@ -101,7 +123,15 @@ export function readJapanVipLearningLibrary(): JapanVipLearningLibrary {
     return {
       version: 1,
       articles: Array.isArray(parsed.articles)
-        ? parsed.articles.map((article) => ({ ...article, analysis: normalizeStyleAnalysis(article.analysis) }))
+        ? parsed.articles.map((article) => ({
+            ...article,
+            analysis: normalizeStyleAnalysis(article.analysis),
+            hermesReview: normalizeLearningReview(article.hermesReview),
+            approvalStatus: article.approvalStatus === "pending" || article.approvalStatus === "rejected"
+              ? article.approvalStatus
+              : "approved",
+            approvedAt: typeof article.approvedAt === "string" ? article.approvedAt : null,
+          }))
         : [],
       rules: Array.isArray(parsed.rules) ? parsed.rules : [],
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : nowIso(),
@@ -109,6 +139,35 @@ export function readJapanVipLearningLibrary(): JapanVipLearningLibrary {
   } catch {
     throw new HttpError(500, "JAPANVIP_LEARNING_CORRUPT", "Thư viện học nội dung bị hỏng");
   }
+}
+
+export function normalizeLearningReview(value: unknown): JapanVipLearningReview | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const criteria = Array.isArray(raw.criteria) ? raw.criteria.slice(0, 6).map((item) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    return {
+      key: typeof row.key === "string" ? row.key.slice(0, 40) : "other",
+      label: typeof row.label === "string" ? row.label.slice(0, 80) : "Tiêu chí",
+      score: Math.max(0, Math.min(100, Math.round(Number(row.score) || 0))),
+      maxScore: 100,
+      feedback: typeof row.feedback === "string" ? row.feedback.trim().slice(0, 1_000) : "",
+    };
+  }) : [];
+  const accuracy = criteria.find((item) => item.key === "accuracy" || item.key === "factual")?.score;
+  const totalScore = criteria.length
+    ? Math.round(criteria.reduce((sum, item) => sum + item.score, 0) / criteria.length)
+    : Math.max(0, Math.min(100, Math.round(Number(raw.totalScore) || 0)));
+  return {
+    totalScore,
+    accuracyScore: Math.max(0, Math.min(100, Math.round(Number(accuracy ?? raw.accuracyScore) || 0))),
+    verdict: totalScore >= 90 ? "excellent" : totalScore >= 85 ? "good" : "needs_work",
+    summary: typeof raw.summary === "string" ? raw.summary.trim().slice(0, 2_000) : "",
+    strengths: cleanStrings(raw.strengths, 12),
+    issues: cleanStrings(raw.issues, 12),
+    criteria,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : nowIso(),
+  };
 }
 
 export function writeJapanVipLearningLibrary(library: JapanVipLearningLibrary): void {
@@ -147,13 +206,14 @@ export function emptyStyleAnalysis(): JapanVipStyleAnalysis {
 export function japanVipLearningContext(selectedReferenceIds: string[]): string {
   const library = readJapanVipLearningLibrary();
   const selected = new Set(selectedReferenceIds);
-  const articles = library.articles.filter((article) => article.active && selected.has(article.id));
+  const articles = library.articles.filter((article) => article.active && (article.kind === "japanvip" || selected.has(article.id)));
   const rules = library.rules.filter((rule) => rule.active);
   const articleContext = articles.map((article, index) => {
     const analysis = article.analysis;
     return [
       `### BÀI THAM KHẢO ${index + 1}: ${article.title}`,
       `Loại: ${article.kind}`,
+      article.kind === "japanvip" ? "Ưu tiên: nguồn nội bộ Japan VIP đã được chủ sở hữu duyệt" : "",
       analysis.summary ? `Tóm tắt phong cách: ${analysis.summary}` : "",
       analysis.structure.length ? `Cấu trúc: ${analysis.structure.join(" | ")}` : "",
       analysis.openingPatterns.length ? `Cách mở bài: ${analysis.openingPatterns.join(" | ")}` : "",
@@ -183,7 +243,7 @@ export function findCopiedReferenceExcerpt(article: string, selectedReferenceIds
   const selected = new Set(selectedReferenceIds);
   const output = comparable(article);
   for (const reference of readJapanVipLearningLibrary().articles) {
-    if (!selected.has(reference.id)) continue;
+    if (!reference.active || (reference.kind !== "japanvip" && !selected.has(reference.id))) continue;
     const candidates = reference.text
       .split(/(?<=[.!?…])\s+|\n+/)
       .map((sentence) => comparable(sentence))
