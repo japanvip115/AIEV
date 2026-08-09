@@ -179,7 +179,10 @@ function markdownToHtml(markdown: string): string {
     if (!line) { index += 1; continue; }
     const heading = line.match(/^(#{1,3})\s+(.+)$/);
     if (heading) {
-      const level = heading[1].length === 1 ? 2 : Math.min(heading[1].length, 3);
+      // CMS và trang preview đã có H1 từ metadata project; bỏ H1 trong Markdown
+      // để không lặp tiêu đề và giữ fragment đúng hợp đồng CMS.
+      if (heading[1].length === 1) { index += 1; continue; }
+      const level = Math.min(heading[1].length, 3);
       out.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
       index += 1;
       continue;
