@@ -293,19 +293,31 @@ function figureStyle(resolved: ResolvedFormat, image: ArticleImage): string {
   ].join(";");
 }
 
-function renderFigure(image: ArticleImage, inCell = false): string {
+/**
+ * Nhãn tiếng Việt phủ lên ảnh.
+ *
+ * Ảnh hãng Nhật có chữ in sẵn trong hình (tên chế độ, nhãn bảng điều khiển).
+ * Vẽ lại ảnh bằng AI thì ra một sản phẩm khác và có thể bịa cả số liệu, nên ở
+ * đây ảnh gốc GIỮ NGUYÊN TỪNG PIXEL và chữ Việt chỉ nằm đè lên bằng HTML - bỏ
+ * nhãn là ảnh về đúng bản gốc của hãng.
+ */
+function overlayHtml(image: ArticleImage): string {
+  const text = (image.overlayText ?? "").trim();
+  if (!text) return "";
+  const place =
+    image.overlayPosition === "top" ? "top:0;left:0;right:0"
+    : image.overlayPosition === "center" ? "top:50%;left:0;right:0;transform:translateY(-50%)"
+    : "bottom:0;left:0;right:0";
+  return `<span style="position:absolute;${place};background:rgba(15,23,42,.82);color:#fff;font-size:14px;line-height:1.45;font-weight:600;padding:10px 12px;text-align:center;display:block">${escapeHtml(text)}</span>`;
+}
+
+/** Chỉ phần ảnh (kèm nhãn phủ nếu có), chưa có chú thích. */
+function renderMedia(image: ArticleImage, inCell: boolean): string {
   const src = safeHttpUrl(image.url);
   if (!src) return "";
   const resolved = resolveImageFormat(image);
   const alt = escapeHtml(captionOf(image) || image.role);
   const size = image.width && image.height ? ` width="${image.width}" height="${image.height}"` : "";
-  // Chú thích chung chung thì KHÔNG in ra. Một dòng "Ảnh chính thức từ hãng"
-  // dưới mỗi ảnh không nói gì về tấm ảnh, chỉ làm bài dài thêm.
-  const caption = hasContextCaption(image)
-    ? `<figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${escapeHtml(captionOf(image))}</figcaption>`
-    : "";
-  // Trong ô lưới thì ảnh lấp đầy ô đã có sẵn kích thước; ngoài lưới thì tự mang
-  // chiều rộng của mình.
   // Trong ô lưới thì ảnh LẤP ĐẦY ô: cover cắt phần thừa nên mọi ô đầy như nhau,
   // không còn mảng nền xám hai bên. Riêng sơ đồ và bản vẽ kích thước thì không
   // bao giờ cắt - cắt là mất số đo, và số đo mới là toàn bộ lý do có tấm ảnh đó.
@@ -313,9 +325,27 @@ function renderFigure(image: ArticleImage, inCell = false): string {
   const style = inCell
     ? `display:block;width:100%;height:100%;object-fit:${noCrop ? "contain" : "cover"};object-position:center;border-radius:14px`
     : figureStyle(resolved, image);
-  const margin = inCell ? "margin:0" : resolved.layout === "full" ? "margin:0 0 26px" : "margin:0";
-  return `<figure style="${margin}"><img src="${src}" alt="${alt}"${size} loading="lazy" decoding="async" style="${style}"><figcaption-placeholder></figure>`
-    .replace("<figcaption-placeholder>", caption);
+  const img = `<img src="${src}" alt="${alt}"${size} loading="lazy" decoding="async" style="${style}">`;
+  const overlay = overlayHtml(image);
+  if (!overlay) return img;
+  const wrap = inCell ? "position:relative;width:100%;height:100%" : `position:relative;display:block;width:${resolved.displayWidth ?? resolved.box.maxWidth}px;max-width:100%;margin:0 auto`;
+  return `<span style="${wrap};overflow:hidden;border-radius:14px">${img}${overlay}</span>`;
+}
+
+/** Chú thích chung chung thì KHÔNG in ra - dưới bốn ảnh một hàng, bốn dòng y hệt
+    nhau không nói được tấm nào chứng minh điều gì. */
+function renderCaption(image: ArticleImage): string {
+  return hasContextCaption(image)
+    ? `<figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${escapeHtml(captionOf(image))}</figcaption>`
+    : "";
+}
+
+function renderFigure(image: ArticleImage, inCell = false): string {
+  const media = renderMedia(image, inCell);
+  if (!media) return "";
+  const layout = resolveImageFormat(image).layout;
+  const margin = inCell ? "margin:0" : layout === "full" ? "margin:0 0 26px" : "margin:0";
+  return `<figure style="${margin}">${media}${renderCaption(image)}</figure>`;
 }
 
 /** Ảnh lạ (AI chèn URL ngoài manifest): vẫn hiện, nhưng không đoán khổ bừa. */
@@ -344,12 +374,9 @@ function renderGroup(images: ArticleImage[]): string {
   const basis = `calc(${(100 / perRow).toFixed(4)}% - ${Math.round((14 * (perRow - 1)) / perRow)}px)`;
   const minWidth = perRow >= 4 ? 140 : 240;
   const cells = images
-    .map((image) => renderFigure(image, true))
-    .filter(Boolean)
-    .map((figure) => {
-      const [, img = "", cap = ""] = figure.match(/^<figure[^>]*>(<img[^>]*>)(.*)<\/figure>$/s) ?? [];
-      return `<div style="flex:1 1 ${basis};min-width:${minWidth}px"><div style="aspect-ratio:1;background:#f8fafc;border-radius:14px;overflow:hidden">${img}</div>${cap}</div>`;
-    })
+    .map((image) => ({ media: renderMedia(image, true), caption: renderCaption(image) }))
+    .filter((cell) => cell.media)
+    .map((cell) => `<div style="flex:1 1 ${basis};min-width:${minWidth}px"><figure style="margin:0"><div style="aspect-ratio:1;background:#f8fafc;border-radius:14px;overflow:hidden">${cell.media}</div>${cell.caption}</figure></div>`)
     .join("");
   // flex chứ không phải grid: `flex-basis` theo % cộng `min-width` cho đúng SỐ
   // ẢNH MỘT HÀNG trên màn rộng rồi tự rút bớt cột trên điện thoại - grid

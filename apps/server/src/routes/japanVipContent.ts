@@ -87,6 +87,7 @@ function imageWritingContext(project: JapanVipContentProject): string {
     }),
     "Ảnh hero đặt đầu bài. Ảnh feature/detail/dimensions/maintenance phải đặt sát phần nội dung thực sự giải thích đúng hình.",
     "Chèn ảnh bằng cú pháp Markdown ![alt](url) trên một dòng riêng. Hệ thống tự thu ảnh cho vừa khung và tự dàn hàng - KHÔNG tự viết thẻ HTML, style, width hay bảng để dàn ảnh.",
+    "Ảnh nào có nhãn overlay tiếng Việt thì nhãn đó đã phủ lên chữ Nhật in trong hình; đừng mô tả lại nội dung nhãn trong câu văn ngay cạnh ảnh.",
     "Ảnh role=feature-small được gom 4 ảnh một hàng, nên mỗi ảnh loại này BẮT BUỘC có chú thích ngắn nói đúng điều tấm ảnh đó chứng minh; không đặt chú thích chung chung hay trùng nhau.",
     "KHÔNG bắt buộc dùng hết ảnh đã duyệt. Chỉ chèn ảnh nào thực sự minh họa cho đoạn văn quanh nó; ảnh không có chỗ đứng hợp lý thì bỏ qua.",
     "Không dùng ảnh pending/rejected, không lặp URL và không suy ra claim chỉ từ hình ảnh.",
@@ -453,7 +454,8 @@ router.patch("/:id/images/:imageId", (req, res) => {
   const explicitDecision = body.status !== undefined || body.role !== undefined;
   if (typeof body.status === "string" && IMAGE_STATUSES.has(body.status as JapanVipImageStatus)) image.status = body.status as JapanVipImageStatus;
   if (typeof body.role === "string" && IMAGE_ROLES.has(body.role as JapanVipImageRole)) image.role = body.role as JapanVipImageRole;
-  for (const key of ["altText", "caption", "intendedSection", "featureGroup"] as const) if (typeof body[key] === "string") image[key] = body[key].trim().slice(0, 500);
+  for (const key of ["altText", "caption", "intendedSection", "featureGroup", "overlayText"] as const) if (typeof body[key] === "string") image[key] = body[key].trim().slice(0, 500);
+  if (body.overlayPosition === "top" || body.overlayPosition === "center" || body.overlayPosition === "bottom") image.overlayPosition = body.overlayPosition;
   if (explicitDecision) {
     image.selectionOrigin = "manual";
     image.selectionConfidence = null;

@@ -92,6 +92,12 @@ export interface JapanVipContentImage {
   featureGroup: string;
   width: number | null;
   height: number | null;
+  /**
+   * Nhãn tiếng Việt phủ LÊN TRÊN ảnh, che chữ Nhật in sẵn trong hình.
+   * Ảnh gốc không bị đụng tới một pixel nào - bỏ nhãn là ảnh về nguyên trạng.
+   */
+  overlayText?: string;
+  overlayPosition?: "top" | "center" | "bottom";
   selectionOrigin?: "manual" | "auto";
   selectionConfidence?: number | null;
   selectionReason?: string;
@@ -146,6 +152,8 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
       selectionOrigin: image.selectionOrigin === "auto" ? "auto" : "manual",
       selectionConfidence: typeof image.selectionConfidence === "number" ? image.selectionConfidence : null,
       selectionReason: typeof image.selectionReason === "string" ? image.selectionReason : "",
+      overlayText: typeof image.overlayText === "string" ? image.overlayText : "",
+      overlayPosition: image.overlayPosition === "top" || image.overlayPosition === "center" ? image.overlayPosition : "bottom",
     })) : [],
   };
 }

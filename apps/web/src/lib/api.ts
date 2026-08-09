@@ -2979,6 +2979,9 @@ export interface JapanVipContentProject {
     featureGroup: string;
     width: number | null;
     height: number | null;
+    /** Nhãn tiếng Việt phủ lên ảnh để che chữ Nhật; ảnh gốc không bị sửa. */
+    overlayText?: string;
+    overlayPosition?: "top" | "center" | "bottom";
     selectionOrigin?: "manual" | "auto";
     selectionConfidence?: number | null;
     selectionReason?: string;
