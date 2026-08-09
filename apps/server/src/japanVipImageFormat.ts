@@ -55,14 +55,22 @@ const PRESETS: JapanVipImageFormatPreset[] = [
   { id: "square", label: "Vuông", aspectRatio: 1, tolerance: 0.12, minWidth: 600, minHeight: 600, fit: "contain", allowFullBleed: false },
   { id: "portrait", label: "Dọc", aspectRatio: 3 / 4, tolerance: 0.15, minWidth: 600, minHeight: 800, fit: "contain", allowFullBleed: false },
   { id: "diagram-wide", label: "Sơ đồ rộng", aspectRatio: null, tolerance: 1, minWidth: 1000, minHeight: 0, fit: "contain", allowFullBleed: false },
+  // Hai khổ dưới lấy từ ảnh THẬT của trang hãng Nhật, không phải từ lý thuyết:
+  // Panasonic xuất ảnh tính năng ở 864×1222 (0,71) cho mobile và 1920×795 (2,42)
+  // cho desktop. Không khai hai khổ này thì phần lớn ảnh hãng không khớp khổ nào,
+  // và hệ quả thật là chúng không bao giờ đủ điều kiện tự duyệt.
+  { id: "portrait-tall", label: "Dọc cao (5:7)", aspectRatio: 5 / 7, tolerance: 0.1, minWidth: 600, minHeight: 800, fit: "contain", allowFullBleed: false },
+  { id: "banner-wide", label: "Siêu rộng (12:5)", aspectRatio: 12 / 5, tolerance: 0.12, minWidth: 1200, minHeight: 500, fit: "contain", allowFullBleed: false },
 ];
 
 const ROLES: JapanVipRoleFormat[] = [
   { role: "hero", accept: ["hero-wide"], layout: "full" },
   { role: "main-packshot", accept: ["content-landscape", "square"], layout: "solo" },
   { role: "alternate-angle", accept: ["content-landscape"], layout: "grid-2" },
-  { role: "feature", accept: ["content-landscape"], layout: "grid-2" },
-  { role: "feature-small", accept: ["square", "content-landscape"], layout: "grid-3" },
+  // feature nhận thêm hai khổ "đời thực" ở trên: ảnh tính năng của hãng Nhật hầu
+  // như luôn là bản dọc cao hoặc bản băng ngang, hiếm khi đúng 4:3.
+  { role: "feature", accept: ["content-landscape", "portrait-tall", "banner-wide"], layout: "grid-2" },
+  { role: "feature-small", accept: ["square", "content-landscape", "portrait-tall"], layout: "grid-3" },
   { role: "detail", accept: ["square"], layout: "grid-2" },
   { role: "dimensions", accept: ["diagram-wide"], layout: "solo" },
   { role: "maintenance", accept: ["content-landscape"], layout: "grid-2" },
