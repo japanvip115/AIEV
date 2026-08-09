@@ -21,6 +21,7 @@ import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningCo
 import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
 import { researchOfficialProduct } from "../officialProductResearch.js";
+import { applyLearnedImageSelection, getJapanVipImageLearningProfile, recordExplicitImageDecision, removeExplicitImageDecision } from "../japanVipImageLearning.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -156,6 +157,8 @@ router.post("/", (req, res) => {
   res.status(201).json(project);
 });
 
+router.get("/image-learning/profile", (_req, res) => res.json(getJapanVipImageLearningProfile()));
+
 router.post("/auto", async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const url = typeof body.url === "string" ? body.url.trim() : "";
@@ -214,6 +217,7 @@ router.post("/auto", async (req, res) => {
     project.targetKeyword = targetKeyword || name;
     project.outline = outline;
     project.article = article;
+    applyLearnedImageSelection({ projectModel: project.productModel, primaryUrl: project.primaryUrl, images: project.images });
     project.status = "review";
     project.notes += " Nội dung đã tạo xong và đang chờ kiểm tra claim, ảnh và Hermes trước khi duyệt.";
     writeJapanVipContent(project);
@@ -359,6 +363,7 @@ router.post("/:id/images/discover", async (req, res) => {
     });
   }
   project.images = project.images.slice(0, 240);
+  applyLearnedImageSelection({ projectModel: project.productModel, primaryUrl: project.primaryUrl, images: project.images });
   writeJapanVipContent(project);
   res.status(201).json(project);
 });
@@ -368,9 +373,17 @@ router.patch("/:id/images/:imageId", (req, res) => {
   const image = project.images.find((item) => item.id === req.params.imageId);
   if (!image) throw new HttpError(404, "IMAGE_NOT_FOUND", "Không tìm thấy ảnh trong project");
   const body = (req.body ?? {}) as Record<string, unknown>;
+  const explicitDecision = body.status !== undefined || body.role !== undefined;
   if (typeof body.status === "string" && IMAGE_STATUSES.has(body.status as JapanVipImageStatus)) image.status = body.status as JapanVipImageStatus;
   if (typeof body.role === "string" && IMAGE_ROLES.has(body.role as JapanVipImageRole)) image.role = body.role as JapanVipImageRole;
   for (const key of ["altText", "caption", "intendedSection", "featureGroup"] as const) if (typeof body[key] === "string") image[key] = body[key].trim().slice(0, 500);
+  if (explicitDecision) {
+    image.selectionOrigin = "manual";
+    image.selectionConfidence = null;
+    image.selectionReason = "Chủ sở hữu đã lựa chọn thủ công";
+    if (image.status === "pending") removeExplicitImageDecision(project.id, image.id);
+    else recordExplicitImageDecision(project.id, image);
+  }
   writeJapanVipContent(project);
   res.json(project);
 });
@@ -379,6 +392,7 @@ router.delete("/:id/images/:imageId", (req, res) => {
   const project = readJapanVipContent(req.params.id);
   const next = project.images.filter((item) => item.id !== req.params.imageId);
   if (next.length === project.images.length) throw new HttpError(404, "IMAGE_NOT_FOUND", "Không tìm thấy ảnh trong project");
+  removeExplicitImageDecision(project.id, req.params.imageId);
   project.images = next;
   writeJapanVipContent(project);
   res.json(project);

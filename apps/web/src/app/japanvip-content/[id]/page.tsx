@@ -26,12 +26,14 @@ import {
   applyJapanVipSelectiveRevision,
   cancelJapanVipSelectiveRevision,
   getJapanVipContentProject,
+  getJapanVipImageLearningProfile,
   getJapanVipLearningLibrary,
   updateJapanVipContentProject,
   updateJapanVipContentImage,
   type JapanVipContentProject,
   type JapanVipAiProvider,
   type JapanVipContentStatus,
+  type JapanVipImageLearningProfile,
   type JapanVipLearningLibrary,
   type JapanVipRevisionCategory,
 } from "@/lib/api";
@@ -70,6 +72,7 @@ export default function JapanVipContentDetailPage() {
   const [manualSourceTitle, setManualSourceTitle] = useState("");
   const [manualSourceText, setManualSourceText] = useState("");
   const [imageSourceUrl, setImageSourceUrl] = useState("");
+  const [imageLearningProfile, setImageLearningProfile] = useState<JapanVipImageLearningProfile | null>(null);
   const [learning, setLearning] = useState<JapanVipLearningLibrary | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -82,10 +85,15 @@ export default function JapanVipContentDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const [next, nextLearning] = await Promise.all([getJapanVipContentProject(id), getJapanVipLearningLibrary()]);
+      const [next, nextLearning, nextImageLearningProfile] = await Promise.all([
+        getJapanVipContentProject(id),
+        getJapanVipLearningLibrary(),
+        getJapanVipImageLearningProfile(),
+      ]);
       setProject(next);
       setDraft(next);
       setLearning(nextLearning);
+      setImageLearningProfile(nextImageLearningProfile);
       if (next.sources.length === 0 && next.primaryUrl) setSourceUrl(next.primaryUrl);
       setError(null);
     } catch (e) {
@@ -127,6 +135,12 @@ export default function JapanVipContentDetailPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function updateImageDecision(imageId: string, next: Partial<JapanVipContentProject["images"][number]>) {
+    const updatedProject = await updateJapanVipContentImage(id, imageId, next);
+    setImageLearningProfile(await getJapanVipImageLearningProfile());
+    return updatedProject;
   }
 
   async function save() {
@@ -313,10 +327,10 @@ export default function JapanVipContentDetailPage() {
 
         <section id="images" className="scroll-mt-28">
           <div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_14%,var(--surface))] text-[var(--primary)]"><Images size={18} /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">Giai đoạn 2</p><h2 className="text-xl font-bold">Ảnh sản phẩm và tính năng</h2></div></div>
-          <Card title="Kho ảnh đã kiểm duyệt" actions={<span className="text-xs text-[var(--text-muted)]">{draft.images.filter((image) => image.status === "approved").length} đã duyệt · {draft.images.filter((image) => image.status === "pending").length} chờ duyệt</span>}>
+          <Card title="Kho ảnh đã kiểm duyệt" actions={<div className="flex flex-wrap items-center justify-end gap-2 text-xs text-[var(--text-muted)]"><span>{draft.images.filter((image) => image.status === "approved").length} đã duyệt · {draft.images.filter((image) => image.status === "pending").length} chờ duyệt</span>{imageLearningProfile && <Badge tone={imageLearningProfile.mode === "hybrid" ? "success" : "running"} label={imageLearningProfile.mode === "hybrid" ? "AI tự chọn ảnh an toàn" : `Đang học ${imageLearningProfile.labeledImages}/${imageLearningProfile.requiredImages} ảnh · ${imageLearningProfile.reviewedProjects}/${imageLearningProfile.requiredProjects} dự án`} />}</div>}>
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
               <p className="text-sm font-semibold">Thu thập từ trang chính thức của hãng</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">Chỉ ảnh bạn duyệt mới được chèn vào bài. Hệ thống không dùng ảnh đối thủ làm dữ kiện hoặc tài sản xuất bản.</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">{imageLearningProfile?.mode === "hybrid" ? "Ảnh hãng khớp đúng model, đủ độ phân giải và đạt độ tin cậy cao sẽ được tự duyệt. Ảnh đại diện hoặc chưa chắc chắn vẫn chờ bạn kiểm tra." : "Hệ thống chỉ học từ lựa chọn Duyệt dùng/Loại ảnh của bạn. Sau 3 dự án và 24 ảnh có nhãn, ảnh hãng an toàn sẽ được tự chọn cho các bài sau."} Hệ thống không dùng ảnh đối thủ làm tài sản xuất bản.</p>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <input className="input flex-1" value={imageSourceUrl} onChange={(e) => setImageSourceUrl(e.target.value)} placeholder="Dán URL gallery, feature hoặc trang sản phẩm của hãng…" />
                 <Button disabled={!imageSourceUrl.trim() || busy !== null} onClick={() => void run("discover-images", async () => { const next = await discoverJapanVipContentImages(id, imageSourceUrl.trim(), "official"); setImageSourceUrl(""); return next; })}><Images size={15} /> {busy === "discover-images" ? "Đang thu thập…" : "Thu thập ảnh hãng"}</Button>
@@ -326,9 +340,10 @@ export default function JapanVipContentDetailPage() {
               {draft.images.map((image) => <article key={image.id} className={`overflow-hidden rounded-[var(--radius)] border ${image.status === "approved" ? "border-emerald-400" : image.status === "rejected" ? "border-red-300 opacity-60" : "border-[var(--border)]"}`}>
                 <div className="grid h-44 place-items-center bg-white p-2"><img src={image.url} alt={image.altText || "Ảnh ứng viên sản phẩm"} className="max-h-full max-w-full object-contain" loading="lazy" /></div>
                 <div className="flex flex-col gap-2 border-t border-[var(--border)] p-3">
+                  {image.selectionOrigin === "auto" && image.selectionConfidence != null && <div className="flex flex-wrap items-center gap-2"><Badge tone={image.status === "approved" ? "success" : "running"} label={`AI ${image.status === "approved" ? "tự duyệt" : "đề xuất"} ${Math.round(image.selectionConfidence * 100)}%`} />{image.selectionReason && <span className="text-[11px] text-[var(--text-muted)]">{image.selectionReason}</span>}</div>}
                   <div className="grid grid-cols-2 gap-2">
-                    <select aria-label="Trạng thái ảnh" className="input" value={image.status} disabled={busy !== null} onChange={(e) => void run(`image-status-${image.id}`, () => updateJapanVipContentImage(id, image.id, { status: e.target.value as typeof image.status }))}><option value="pending">Chờ duyệt</option><option value="approved">Duyệt dùng</option><option value="rejected">Loại ảnh</option></select>
-                    <select aria-label="Vai trò ảnh" className="input" value={image.role} disabled={busy !== null} onChange={(e) => void run(`image-role-${image.id}`, () => updateJapanVipContentImage(id, image.id, { role: e.target.value as typeof image.role }))}><option value="hero">Hero</option><option value="main-packshot">Ảnh sản phẩm chính</option><option value="alternate-angle">Góc khác</option><option value="feature">Feature lớn</option><option value="feature-small">Feature nhỏ (gom bảng)</option><option value="detail">Chi tiết</option><option value="dimensions">Kích thước</option><option value="maintenance">Vệ sinh</option></select>
+                    <select aria-label="Trạng thái ảnh" className="input" value={image.status} disabled={busy !== null} onChange={(e) => void run(`image-status-${image.id}`, () => updateImageDecision(image.id, { status: e.target.value as typeof image.status }))}><option value="pending">Chờ duyệt</option><option value="approved">Duyệt dùng</option><option value="rejected">Loại ảnh</option></select>
+                    <select aria-label="Vai trò ảnh" className="input" value={image.role} disabled={busy !== null} onChange={(e) => void run(`image-role-${image.id}`, () => updateImageDecision(image.id, { role: e.target.value as typeof image.role }))}><option value="hero">Hero</option><option value="main-packshot">Ảnh sản phẩm chính</option><option value="alternate-angle">Góc khác</option><option value="feature">Feature lớn</option><option value="feature-small">Feature nhỏ (gom bảng)</option><option value="detail">Chi tiết</option><option value="dimensions">Kích thước</option><option value="maintenance">Vệ sinh</option></select>
                   </div>
                   <input className="input" value={image.intendedSection} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, intendedSection: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-section-${image.id}`, () => updateJapanVipContentImage(id, image.id, { intendedSection: e.target.value }))} placeholder="Phần bài phù hợp, ví dụ: Công nghệ IH" />
                   {image.role === "feature-small" && <input className="input" value={image.featureGroup} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, featureGroup: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-group-${image.id}`, () => updateJapanVipContentImage(id, image.id, { featureGroup: e.target.value }))} placeholder="Tên bảng gom, ví dụ: 6 công nghệ lõi" />}

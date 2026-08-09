@@ -2979,6 +2979,9 @@ export interface JapanVipContentProject {
     featureGroup: string;
     width: number | null;
     height: number | null;
+    selectionOrigin?: "manual" | "auto";
+    selectionConfidence?: number | null;
+    selectionReason?: string;
     discoveredAt: string;
   }>;
   createdAt: string;
@@ -2990,6 +2993,22 @@ export const getJapanVipContentProjects = () =>
 
 export const getJapanVipContentProject = (id: string) =>
   request<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}`);
+
+export interface JapanVipImageLearningProfile {
+  mode: "manual" | "hybrid";
+  reviewedProjects: number;
+  labeledImages: number;
+  approvedImages: number;
+  rejectedImages: number;
+  requiredProjects: number;
+  requiredImages: number;
+  roleCounts: Partial<Record<JapanVipContentProject["images"][number]["role"], number>>;
+  roleStats: Partial<Record<JapanVipContentProject["images"][number]["role"], { approved: number; rejected: number; approvalRate: number }>>;
+  updatedAt: string | null;
+}
+
+export const getJapanVipImageLearningProfile = () =>
+  request<JapanVipImageLearningProfile>("/api/japanvip-content/image-learning/profile");
 
 export const createJapanVipContentProject = (input: {
   name: string;

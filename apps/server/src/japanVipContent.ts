@@ -92,6 +92,9 @@ export interface JapanVipContentImage {
   featureGroup: string;
   width: number | null;
   height: number | null;
+  selectionOrigin?: "manual" | "auto";
+  selectionConfidence?: number | null;
+  selectionReason?: string;
   discoveredAt: string;
 }
 
@@ -126,7 +129,12 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
     feedback: Array.isArray(project.feedback) ? project.feedback.map((item) => ({ ...item, ruleId: typeof item.ruleId === "string" ? item.ruleId : null })) : [],
     hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
     selectiveRevision: project.selectiveRevision && typeof project.selectiveRevision === "object" ? project.selectiveRevision : null,
-    images: Array.isArray(project.images) ? project.images : [],
+    images: Array.isArray(project.images) ? project.images.map((image) => ({
+      ...image,
+      selectionOrigin: image.selectionOrigin === "auto" ? "auto" : "manual",
+      selectionConfidence: typeof image.selectionConfidence === "number" ? image.selectionConfidence : null,
+      selectionReason: typeof image.selectionReason === "string" ? image.selectionReason : "",
+    })) : [],
   };
 }
 
