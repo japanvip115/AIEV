@@ -152,7 +152,7 @@ export default function JapanVipLearningPage() {
               const approvalReview = article.improvementDraft?.review ?? review;
               const passesGate = Boolean(approvalReview && approvalReview.totalScore >= 85 && approvalReview.accuracyScore >= 80);
               const originalPassesGate = Boolean(review && review.totalScore >= 85 && review.accuracyScore >= 80);
-              const canImprove = Boolean(review && review.totalScore >= 75 && review.totalScore < 85 && article.approvalStatus !== "approved");
+              const canImprove = Boolean(approvalReview && approvalReview.totalScore >= 75 && !passesGate && article.approvalStatus !== "approved");
               return (
               <div key={article.id} className="rounded-[var(--radius)] border border-[var(--border)] p-4">
                 <div className="flex items-start gap-3">
@@ -201,8 +201,8 @@ export default function JapanVipLearningPage() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div><div className="flex items-baseline gap-2"><span className={`text-2xl font-bold ${originalPassesGate ? "text-emerald-600" : "text-amber-600"}`}>{review.totalScore}/100</span><span className="text-xs text-[var(--text-muted)]">Độ chính xác {review.accuracyScore}/100</span></div>{review.evaluator && <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{review.evaluator.fallback ? `Dự phòng: Hermes · ${review.evaluator.model}` : `Chấm bởi Ollama Cloud · ${review.evaluator.model}`}</p>}</div>
                           <div className="flex flex-wrap gap-2">
-                            <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`review-${article.id}`, () => reviewJapanVipOwnedArticle(article.id))}><RotateCcw size={13} /> Chấm lại</Button>
-                            {canImprove && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`improve-${article.id}`, () => improveJapanVipOwnedArticle(article.id))}><Sparkles size={13} /> {busy === `improve-${article.id}` ? "Đang sửa chọn lọc…" : article.improvementDraft ? "Tạo lại bản cải thiện" : "Cải thiện phần điểm thấp"}</Button>}
+                            <Button small variant="secondary" disabled={busy !== null} title="Chấm lại nguyên văn bài mẫu đã sao chép" onClick={() => void run(`review-${article.id}`, () => reviewJapanVipOwnedArticle(article.id))}><RotateCcw size={13} /> Chấm lại bài gốc</Button>
+                            {canImprove && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`improve-${article.id}`, () => improveJapanVipOwnedArticle(article.id))}><Sparkles size={13} /> {busy === `improve-${article.id}` ? "Đang sửa chọn lọc…" : article.improvementDraft?.review ? "Cải thiện tiếp điểm còn yếu" : article.improvementDraft ? "Tạo lại bản cải thiện" : "Cải thiện phần điểm thấp"}</Button>}
                             {article.approvalStatus !== "rejected" && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`reject-${article.id}`, () => rejectJapanVipOwnedArticle(article.id))}><XCircle size={13} /> Loại</Button>}
                             {article.approvalStatus !== "approved" && <Button small disabled={busy !== null || !passesGate} title={!passesGate ? "Cần tổng ≥85 và độ chính xác ≥80" : undefined} onClick={() => void run(`approve-${article.id}`, () => approveJapanVipOwnedArticle(article.id))}><CheckCircle2 size={13} /> {article.improvementDraft?.review ? "Duyệt bản cải thiện" : "Duyệt làm nguồn"}</Button>}
                           </div>
@@ -211,6 +211,12 @@ export default function JapanVipLearningPage() {
                           {review.criteria.map((criterion) => <div key={criterion.key} className="rounded-[var(--radius)] bg-[var(--surface)] p-2.5"><div className="flex items-center justify-between gap-2 text-xs font-semibold"><span>{criterion.label}</span><span>{criterion.score}/100</span></div><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{criterion.feedback}</p></div>)}
                         </div>
                         {review.issues.length > 0 && <details className="mt-3"><summary className="cursor-pointer text-sm font-medium text-amber-700">Điểm cần cải thiện ({review.issues.length})</summary><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--text-muted)]">{review.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></details>}
+                        {!passesGate && approvalReview && approvalReview.totalScore >= 85 && approvalReview.accuracyScore < 80 && (
+                          <div className="mt-3 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                            <p className="font-semibold">Chưa thể duyệt dù tổng điểm là {approvalReview.totalScore}/100</p>
+                            <p className="mt-1">Độ chính xác đang là {approvalReview.accuracyScore}/100, cần tối thiểu 80. Hãy bấm <strong>Cải thiện phần điểm thấp</strong>; AI chỉ xử lý claim hoặc câu chưa đủ căn cứ, không viết lại bài và không sửa bài mẫu gốc.</p>
+                          </div>
+                        )}
                         {article.improvementDraft && (
                           <div className="mt-3 rounded-[var(--radius)] border-2 border-emerald-300 bg-emerald-50/60 p-3">
                             <div className="flex flex-wrap items-start justify-between gap-3">

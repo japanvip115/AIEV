@@ -196,18 +196,21 @@ router.post("/articles/:articleId/improve", async (req, res) => {
   const library = readJapanVipLearningLibrary();
   const article = library.articles.find((item) => item.id === req.params.articleId);
   if (!article || article.kind !== "japanvip") throw new HttpError(404, "JAPANVIP_REFERENCE_NOT_FOUND", "Không tìm thấy bài Japan VIP");
-  if (!article.hermesReview || article.hermesReview.totalScore < 75 || article.hermesReview.totalScore >= 85) throw new HttpError(409, "NOT_NEAR_APPROVAL", "Chỉ cải thiện chọn lọc bài đạt từ 75 đến 84 điểm");
-  const lowFeedback = article.hermesReview.criteria.filter((item) => item.score < 85).map((item) => `- ${item.label} ${item.score}/100: ${item.feedback}`).join("\n");
+  const currentReview = article.improvementDraft?.review ?? article.hermesReview;
+  const currentText = article.improvementDraft?.review ? article.improvementDraft.improvedText : article.text;
+  const alreadyPasses = Boolean(currentReview && currentReview.totalScore >= JAPANVIP_APPROVAL_SCORE && currentReview.accuracyScore >= JAPANVIP_ACCURACY_SCORE);
+  if (!currentReview || currentReview.totalScore < 75 || alreadyPasses) throw new HttpError(409, "NOT_NEAR_APPROVAL", "Chỉ cải thiện chọn lọc bài gần đạt nhưng chưa qua điều kiện duyệt");
+  const lowFeedback = currentReview.criteria.filter((item) => item.score < 85).map((item) => `- ${item.label} ${item.score}/100: ${item.feedback}`).join("\n");
   const prompt = [
     "Bạn là biên tập viên Japan VIP. Chỉ đề xuất chỉnh sửa CỤC BỘ cho các tiêu chí điểm thấp.",
     "Không viết lại toàn bài, không đổi thông số/claim, không thêm dữ kiện mới. Mỗi before phải là đoạn trích nguyên văn xuất hiện đúng một lần trong bài gốc.",
     "Tối đa 8 thay đổi. Trả JSON thuần: {\"changes\":[{\"before\":\"\",\"after\":\"\",\"reason\":\"\"}]}",
     `ĐIỂM CẦN CẢI THIỆN:\n${lowFeedback}`,
-    `BÀI GỐC BẤT BIẾN:\n${article.text.slice(0, 60_000)}`,
+    `BẢN ĐANG CẢI THIỆN (bài mẫu gốc vẫn bất biến):\n${currentText.slice(0, 60_000)}`,
   ].join("\n\n");
   const ai = await generateOllamaCloudText({ prompt, usageTag: "japanvip-selective-improvement", jsonMode: true });
   const parsed = extractJson<Record<string, unknown>>(ai.text);
-  const built = buildImprovedCopy(article.text, parsed?.changes);
+  const built = buildImprovedCopy(currentText, parsed?.changes);
   article.improvementDraft = { id: nanoid(10), ...built, review: null, createdAt: nowIso() };
   article.approvalStatus = "pending"; article.active = false; article.updatedAt = nowIso();
   writeJapanVipLearningLibrary(library);
