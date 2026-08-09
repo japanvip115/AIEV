@@ -84,7 +84,7 @@ export default function JapanVipContentDetailPage() {
   const [learning, setLearning] = useState<JapanVipLearningLibrary | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
   const [feedbackNote, setFeedbackNote] = useState("");
-  const [saveAsRule, setSaveAsRule] = useState(true);
+  const [saveAsRule, setSaveAsRule] = useState(false);
   const [revisionCategories, setRevisionCategories] = useState<JapanVipRevisionCategory[]>(["cta", "naturalness", "claims", "repetition"]);
   const [revisionRequest, setRevisionRequest] = useState("");
   const [selectedRevisionChangeIds, setSelectedRevisionChangeIds] = useState<string[]>([]);
@@ -557,8 +557,9 @@ export default function JapanVipContentDetailPage() {
               </div>
               <label className="mt-2 flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={saveAsRule} onChange={(e) => setSaveAsRule(e.target.checked)} />
-                Áp dụng phản hồi này như quy tắc cho các bài sau
+                Lưu thành quy tắc chung cho các bài sau (chỉ chọn khi thật sự cần)
               </label>
+              {!saveAsRule && <p className="mt-1 text-xs text-[var(--text-muted)]">Mặc định bài học chỉ thuộc dự án này, không ảnh hưởng các bài viết sau.</p>}
               <Button className="mt-3" small variant="secondary" disabled={!feedbackNote.trim() || busy !== null} onClick={() => void run("feedback", async () => {
                 const next = await addJapanVipContentFeedback(id, { category: feedbackCategory, note: feedbackNote.trim(), saveAsRule });
                 setFeedbackNote("");
