@@ -134,6 +134,38 @@ export function publicationFingerprint(project: JapanVipContentProject): string 
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
+/** Mã model kiểu NP-TZ500, NW-NC10, R-GXCC67X. Bắt buộc có gạch nối và có số. */
+const MODEL_CODE = /\b[A-Z]{1,4}-[A-Z0-9]{2,10}\b/g;
+
+function comparableCode(value: string): string {
+  return value.toLocaleUpperCase("en").replace(/[^A-Z0-9]/g, "");
+}
+
+/**
+ * Mã model xuất hiện trong bài mà KHÔNG có trong nguồn hay fact sheet.
+ *
+ * VÌ SAO CÓ CỔNG NÀY: một bài đã qua cổng đăng với nguyên mục "So sánh NP-TZ500
+ * với Panasonic NP-TH5 và NP-TA5", kèm bảng màu sắc và tính năng, viết là "ba
+ * model trong gói nguồn". Hai mã đó không có trong bất kỳ nguồn nào - AI bịa ra
+ * rồi gán cho Panasonic. Vòng chấm Hermes đầu tiên cho 95/100 độ chính xác và
+ * không thấy gì. Điểm của một mô hình không phải là cổng an toàn; cái này thì có
+ * thể kiểm bằng phép so chuỗi, nên nó phải là phép so chuỗi.
+ */
+export function unknownModelCodes(project: JapanVipContentProject): string[] {
+  const haystack = comparableCode(
+    [project.productModel, project.name, ...project.facts, ...project.sources.map((source) => `${source.title} ${source.text}`)].join(" ")
+  );
+  const found = new Map<string, string>();
+  for (const match of project.article.matchAll(MODEL_CODE)) {
+    const code = match[0];
+    if (!/\d/.test(code)) continue;
+    const key = comparableCode(code);
+    if (key.length < 5 || haystack.includes(key)) continue;
+    found.set(key, code);
+  }
+  return [...found.values()].slice(0, 10);
+}
+
 function publicationBlockers(project: JapanVipContentProject): string[] {
   const blockers: string[] = [];
   if (!project.sources.length) blockers.push("chưa có nguồn chính thức");
@@ -144,6 +176,8 @@ function publicationBlockers(project: JapanVipContentProject): string[] {
   if (!approvedImages.some((image) => image.role === "hero")) blockers.push("chưa có ảnh hero đã duyệt");
   const duplicateUrls = approvedImages.filter((image, index) => approvedImages.findIndex((item) => item.url === image.url) !== index);
   if (duplicateUrls.length) blockers.push("có URL ảnh bị lặp");
+  const phantom = unknownModelCodes(project);
+  if (phantom.length) blockers.push(`bài nhắc mã model không có trong nguồn: ${phantom.join(", ")}`);
   return blockers;
 }
 
