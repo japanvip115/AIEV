@@ -2979,8 +2979,6 @@ export interface JapanVipContentProject {
     featureGroup: string;
     width: number | null;
     height: number | null;
-    /** Khổ ép riêng cho ảnh này; null = theo khổ mặc định của vai trò. */
-    formatPresetId?: string | null;
     selectionOrigin?: "manual" | "auto";
     selectionConfidence?: number | null;
     selectionReason?: string;
@@ -3033,41 +3031,6 @@ export interface JapanVipImageLearningProfile {
 export const getJapanVipImageLearningProfile = () =>
   request<JapanVipImageLearningProfile>("/api/japanvip-content/image-learning/profile");
 
-export interface JapanVipImageFormatPreset {
-  id: string;
-  label: string;
-  /** null = giữ nguyên tỉ lệ gốc của ảnh. */
-  aspectRatio: number | null;
-  tolerance: number;
-  minWidth: number;
-  minHeight: number;
-  fit: "contain" | "cover";
-  allowFullBleed: boolean;
-}
-
-export type JapanVipImageLayout = "full" | "solo" | "grid-2" | "grid-3";
-
-export interface JapanVipRoleFormat {
-  role: JapanVipContentProject["images"][number]["role"];
-  accept: string[];
-  layout: JapanVipImageLayout;
-}
-
-export interface JapanVipImageFormatConfig {
-  version: 1;
-  presets: JapanVipImageFormatPreset[];
-  roles: JapanVipRoleFormat[];
-  updatedAt: string;
-}
-
-export const getJapanVipImageFormat = () =>
-  request<JapanVipImageFormatConfig>("/api/japanvip-content/image-format");
-
-export const saveJapanVipImageFormat = (config: JapanVipImageFormatConfig) =>
-  jsonBody<JapanVipImageFormatConfig>("/api/japanvip-content/image-format", "PUT", config);
-
-export const resetJapanVipImageFormat = () =>
-  post<JapanVipImageFormatConfig>("/api/japanvip-content/image-format/reset");
 
 export const createJapanVipContentProject = (input: {
   name: string;

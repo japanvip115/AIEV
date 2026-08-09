@@ -10,11 +10,8 @@ import {
   type JapanVipReferenceArticle,
 } from "./japanVipLearning.js";
 import {
-  applyHardRules,
   dedupeVariants,
-  readImageFormatConfig,
   resolveImageFormat,
-  type JapanVipImageFormatConfig,
   type JapanVipImageLayout,
   type ResolvedFormat,
 } from "./japanVipImageFormat.js";
@@ -186,7 +183,6 @@ function imageKey(url: string): string {
 
 function markdownToHtml(
   markdown: string,
-  config: JapanVipImageFormatConfig,
   byUrl: Map<string, ArticleImage> = new Map(),
   used?: Set<string>
 ): string {
@@ -243,7 +239,7 @@ function markdownToHtml(
         const known = byUrl.get(imageKey(image[2]));
         if (known) {
           used?.add(known.id);
-          out.push(`<div style="margin:26px 0">${renderFigure(known, config)}</div>`);
+          out.push(`<div style="margin:26px 0">${renderFigure(known)}</div>`);
         } else {
           out.push(renderUnknownFigure(src, image[1]));
         }
@@ -275,21 +271,30 @@ type ArticleImage = JapanVipContentProject["images"][number];
  * không cần media query - thứ duy nhất không viết inline được.
  */
 function figureStyle(resolved: ResolvedFormat, image: ArticleImage): string {
-  const { preset } = resolved;
-  const parts = ["display:block", "width:100%", "height:auto", "border-radius:14px", "background:#f8fafc"];
-  // "Không phóng ảnh nguồn nhỏ": chặn bằng chính chiều rộng thật của ảnh.
-  if (image.width) parts.push(`max-width:min(100%,${image.width}px)`);
-  if (preset.aspectRatio !== null) {
-    parts.push(`aspect-ratio:${Number(preset.aspectRatio.toFixed(4))}`);
-    parts.push(`object-fit:${preset.fit}`);
-  }
-  return parts.join(";");
+  // width/height:auto + max-width/max-height = ảnh tự thu cho vừa khung, giữ
+  // nguyên tỉ lệ, và KHÔNG BAO GIỜ phóng to (max-* chỉ thu nhỏ được). Không cần
+  // aspect-ratio hay object-fit, nên cũng không có đường nào cắt vào ảnh.
+  // width đặt CỤ THỂ chứ không phải auto: với auto, ảnh chiếm 0×0 cho tới khi
+  // tải xong nên cả trang giật một nhịp khi ảnh về - thuộc tính width/height
+  // trên thẻ chỉ giữ được chỗ khi trình duyệt đã biết một chiều. displayWidth
+  // vốn đã bị chặn trên bởi kích thước thật nên vẫn không có đường phóng to.
+  const width = resolved.displayWidth ?? resolved.box.maxWidth;
+  return [
+    "display:block",
+    `width:${width}px`,
+    "max-width:100%",
+    "height:auto",
+    `max-height:${resolved.box.maxHeight}px`,
+    "margin:0 auto",
+    "border-radius:14px",
+    "background:#f8fafc",
+  ].join(";");
 }
 
-function renderFigure(image: ArticleImage, config: JapanVipImageFormatConfig): string {
+function renderFigure(image: ArticleImage): string {
   const src = safeHttpUrl(image.url);
   if (!src) return "";
-  const resolved = applyHardRules(resolveImageFormat(image, config), image);
+  const resolved = resolveImageFormat(image);
   const alt = escapeHtml(image.altText || image.caption || image.role);
   const caption = escapeHtml(image.caption || image.altText || "Ảnh chính thức từ hãng");
   const size = image.width && image.height ? ` width="${image.width}" height="${image.height}"` : "";
@@ -302,25 +307,29 @@ function renderUnknownFigure(src: string, alt: string): string {
   return `<figure style="margin:26px 0"><img src="${src}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" style="display:block;width:100%;height:auto;border-radius:14px"><figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${escapeHtml(alt)}</figcaption></figure>`;
 }
 
-const GRID_MIN: Record<JapanVipImageLayout, number> = { full: 0, solo: 0, "grid-2": 320, "grid-3": 220 };
+/** Số ảnh mỗi hàng trên màn rộng. Ảnh tính năng nhỏ gom 4 một hàng. */
+const PER_ROW: Record<JapanVipImageLayout, number> = { full: 1, solo: 1, "grid-2": 2, "grid-4": 4 };
 
 /**
  * Bọc một nhóm ảnh cùng vai trò thành lưới. Nhóm chỉ có MỘT ảnh thì không bọc -
  * đó chính là ý "một ảnh lớn hoặc lưới 2", không cần thêm giá trị cấu hình.
  */
-function renderGroup(images: ArticleImage[], config: JapanVipImageFormatConfig): string {
-  const usable = images;
-  if (!usable.length) return "";
-  const figures = usable.map((image) => renderFigure(image, config)).filter(Boolean);
+function renderGroup(images: ArticleImage[]): string {
+  if (!images.length) return "";
+  const figures = images.map((image) => renderFigure(image)).filter(Boolean);
   if (figures.length <= 1) return figures.length ? `<div style="margin:26px 0">${figures[0]}</div>` : "";
-  const layout = applyHardRules(resolveImageFormat(usable[0], config), usable[0]).layout;
-  const min = GRID_MIN[layout] || 320;
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(${min}px,1fr));gap:14px;margin:26px 0">${figures.join("")}</div>`;
+  const perRow = PER_ROW[resolveImageFormat(images[0]).layout] ?? 2;
+  // flex chứ không phải grid: `flex-basis` theo % cộng `min-width` cho đúng SỐ
+  // ẢNH MỘT HÀNG trên màn rộng rồi tự rút bớt cột trên điện thoại - grid
+  // auto-fit thì nhồi thêm cột khi còn chỗ, không giữ được đúng 4.
+  const basis = `calc(${(100 / perRow).toFixed(4)}% - ${Math.round((14 * (perRow - 1)) / perRow)}px)`;
+  const minWidth = perRow >= 4 ? 140 : 240;
+  const cells = figures.map((figure) => `<div style="flex:1 1 ${basis};min-width:${minWidth}px">${figure}</div>`).join("");
+  return `<div style="display:flex;flex-wrap:wrap;gap:14px;margin:26px 0">${cells}</div>`;
 }
 
 export function buildJapanVipArticleHtml(project: JapanVipContentProject): string {
   assertApprovedBase(project);
-  const config = readImageFormatConfig();
   // Lọc bản trùng PC/mobile trên TOÀN BÀI, không phải trong từng nhóm: bản PC
   // hay rơi vào vai trò hero còn bản mobile rơi vào lưới feature, lọc theo nhóm
   // thì hai bản của cùng một hình vẫn cùng lên bài ở hai chỗ khác nhau.
@@ -329,7 +338,7 @@ export function buildJapanVipArticleHtml(project: JapanVipContentProject): strin
   // Ảnh AI đã tự chèn trong Markdown thì hệ thống KHÔNG bố trí lại lần nữa,
   // nếu không cùng một hình xuất hiện hai lần trong bài.
   const used = new Set<string>();
-  let body = markdownToHtml(project.article.trim(), config, byUrl, used);
+  let body = markdownToHtml(project.article.trim(), byUrl, used);
 
   const remaining = (role: ArticleImage["role"]) => approved.filter((image) => image.role === role && !used.has(image.id));
   const hero = remaining("hero")[0];
@@ -339,24 +348,24 @@ export function buildJapanVipArticleHtml(project: JapanVipContentProject): strin
 
   if (packshot) {
     used.add(packshot.id);
-    body = body.replace(/<\/p>/, `</p><div style="margin:26px 0">${renderFigure(packshot, config)}</div>`);
+    body = body.replace(/<\/p>/, `</p><div style="margin:26px 0">${renderFigure(packshot)}</div>`);
   }
 
-  const featureGallery = renderGroup(feature, config);
+  const featureGallery = renderGroup(feature);
   if (featureGallery) {
     for (const image of feature) used.add(image.id);
     const featureHeading = /(<h2>[^<]*(?:đáng chú ý|tính năng)[^<]*<\/h2>)/i;
     body = featureHeading.test(body) ? body.replace(featureHeading, `$1${featureGallery}`) : `${featureGallery}${body}`;
   }
 
-  const installGallery = renderGroup(installation, config);
+  const installGallery = renderGroup(installation);
   if (installGallery) {
     for (const image of installation) used.add(image.id);
     const installHeading = /(<h2>[^<]*(?:kiểm tra|lắp đặt)[^<]*<\/h2>)/i;
     body = installHeading.test(body) ? body.replace(installHeading, `${installGallery}$1`) : `${body}${installGallery}`;
   }
 
-  const heroHtml = hero ? renderFigure(hero, config) : "";
+  const heroHtml = hero ? renderFigure(hero) : "";
   return `<article class="jv-article">${heroHtml}${body}</article>`;
 }
 
@@ -367,11 +376,10 @@ export function buildJapanVipArticleHtml(project: JapanVipContentProject): strin
  * không để nó biến mất trong im lặng: liệt kê ra lúc kiểm tra gói đăng.
  */
 export function unusedApprovedImages(project: JapanVipContentProject): ArticleImage[] {
-  const config = readImageFormatConfig();
   const approved = dedupeVariants(project.images.filter((image) => image.status === "approved"));
   const byUrl = new Map(approved.map((image) => [imageKey(image.url), image]));
   const used = new Set<string>();
-  markdownToHtml(project.article.trim(), config, byUrl, used);
+  markdownToHtml(project.article.trim(), byUrl, used);
   const autoPlaced = new Set(["hero", "main-packshot", "alternate-angle", "feature", "feature-small", "dimensions"]);
   return approved.filter((image) => !used.has(image.id) && !autoPlaced.has(image.role));
 }

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { paths } from "./config.js";
 import type { JapanVipContentImage, JapanVipImageRole } from "./japanVipContent.js";
-import { applyHardRules, readImageFormatConfig, resolveImageFormat } from "./japanVipImageFormat.js";
+import { resolveImageFormat } from "./japanVipImageFormat.js";
 import { ensureDir, nowIso } from "./util.js";
 
 interface ImageDecision {
@@ -120,7 +120,6 @@ function inferRole(image: JapanVipContentImage): JapanVipImageRole {
 export function applyLearnedImageSelection(input: { projectModel: string; primaryUrl: string; images: JapanVipContentImage[] }): number {
   const profile = getJapanVipImageLearningProfile();
   if (profile.mode !== "hybrid") return 0;
-  const formatConfig = readImageFormatConfig();
   const modelToken = comparable(input.projectModel);
   let approvedCount = 0;
   for (const image of input.images) {
@@ -128,8 +127,8 @@ export function applyLearnedImageSelection(input: { projectModel: string; primar
     const role = inferRole(image);
     const signal = comparable(`${image.url} ${image.altText} ${image.sourcePageUrl} ${input.primaryUrl}`);
     const exactModel = modelToken.length >= 4 && signal.includes(modelToken);
-    // Ngưỡng kích thước không còn hard-code: mỗi khổ tự khai rộng/cao tối thiểu.
-    const format = applyHardRules(resolveImageFormat({ ...image, role }, formatConfig), { ...image, role });
+    // Ngưỡng kích thước lấy từ chính khung hiển thị của vai trò, không hard-code.
+    const format = resolveImageFormat({ ...image, role });
     const enoughResolution = format.matches;
     const cleanAsset = !/(watermark|logo|icon|banner|sprite|thumbnail|thumb)/i.test(`${image.url} ${image.altText}`);
     const safeRole = !["hero", "main-packshot", "alternate-angle"].includes(role);
@@ -139,7 +138,7 @@ export function applyLearnedImageSelection(input: { projectModel: string; primar
     image.role = role;
     image.selectionOrigin = "auto";
     image.selectionConfidence = confidence;
-    image.selectionReason = `Nguồn hãng; ${exactModel ? "khớp model" : "chưa đủ tín hiệu model"}; ${format.matches ? `đúng khổ ${format.preset.label}` : format.reason || "chưa rõ khổ"}; vai trò ${role}`;
+    image.selectionReason = `Nguồn hãng; ${exactModel ? "khớp model" : "chưa đủ tín hiệu model"}; ${format.matches ? `đủ cho khung ${format.box.label}` : format.reason || "chưa rõ kích thước"}; vai trò ${role}`;
     if (image.sourceType === "official" && exactModel && enoughResolution && cleanAsset && safeRole && roleLearned && confidence >= 0.8) {
       image.status = "approved";
       approvedCount += 1;

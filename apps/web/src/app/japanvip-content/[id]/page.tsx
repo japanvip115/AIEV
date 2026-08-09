@@ -30,7 +30,6 @@ import {
   applyJapanVipSelectiveRevision,
   cancelJapanVipSelectiveRevision,
   getJapanVipContentProject,
-  getJapanVipImageFormat,
   getJapanVipImageLearningProfile,
   getJapanVipLearningLibrary,
   japanVipPublicationPackageDownloadUrl,
@@ -41,7 +40,6 @@ import {
   type JapanVipContentProject,
   type JapanVipAiProvider,
   type JapanVipContentStatus,
-  type JapanVipImageFormatConfig,
   type JapanVipImageLearningProfile,
   type JapanVipLearningLibrary,
   type JapanVipRevisionCategory,
@@ -82,7 +80,6 @@ export default function JapanVipContentDetailPage() {
   const [manualSourceText, setManualSourceText] = useState("");
   const [imageSourceUrl, setImageSourceUrl] = useState("");
   const [imageLearningProfile, setImageLearningProfile] = useState<JapanVipImageLearningProfile | null>(null);
-  const [imageFormat, setImageFormat] = useState<JapanVipImageFormatConfig | null>(null);
   const [learning, setLearning] = useState<JapanVipLearningLibrary | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState("Giọng văn chưa đúng");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -107,17 +104,15 @@ export default function JapanVipContentDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const [next, nextLearning, nextImageLearningProfile, nextImageFormat] = await Promise.all([
+      const [next, nextLearning, nextImageLearningProfile] = await Promise.all([
         getJapanVipContentProject(id),
         getJapanVipLearningLibrary(),
         getJapanVipImageLearningProfile(),
-        getJapanVipImageFormat(),
       ]);
       setProject(next);
       setDraft(next);
       setLearning(nextLearning);
       setImageLearningProfile(nextImageLearningProfile);
-      setImageFormat(nextImageFormat);
       if (next.sources.length === 0 && next.primaryUrl) setSourceUrl(next.primaryUrl);
       setError(null);
     } catch (e) {
@@ -398,14 +393,6 @@ export default function JapanVipContentDetailPage() {
                     <select aria-label="Trạng thái ảnh" className="input" value={image.status} disabled={busy !== null} onChange={(e) => void run(`image-status-${image.id}`, () => updateImageDecision(image.id, { status: e.target.value as typeof image.status }))}><option value="pending">Chờ duyệt</option><option value="approved">Duyệt dùng</option><option value="rejected">Loại ảnh</option></select>
                     <select aria-label="Vai trò ảnh" className="input" value={image.role} disabled={busy !== null} onChange={(e) => void run(`image-role-${image.id}`, () => updateImageDecision(image.id, { role: e.target.value as typeof image.role }))}><option value="hero">Hero</option><option value="main-packshot">Ảnh sản phẩm chính</option><option value="alternate-angle">Góc khác</option><option value="feature">Feature lớn</option><option value="feature-small">Feature nhỏ (gom bảng)</option><option value="detail">Chi tiết</option><option value="dimensions">Kích thước</option><option value="maintenance">Vệ sinh</option></select>
                   </div>
-                  {imageFormat && (() => {
-                    const roleFormat = imageFormat.roles.find((item) => item.role === image.role);
-                    const auto = imageFormat.presets.find((preset) => preset.id === roleFormat?.accept[0]);
-                    return <select aria-label="Khổ ảnh" className="input" value={image.formatPresetId ?? ""} disabled={busy !== null} onChange={(e) => void run(`image-format-${image.id}`, () => updateJapanVipContentImage(id, image.id, { formatPresetId: e.target.value || null }))}>
-                      <option value="">Khổ theo vai trò{auto ? ` · ${auto.label}` : ""}</option>
-                      {imageFormat.presets.map((preset) => <option key={preset.id} value={preset.id}>Ép khổ {preset.label}</option>)}
-                    </select>;
-                  })()}
                   <input className="input" value={image.intendedSection} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, intendedSection: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-section-${image.id}`, () => updateJapanVipContentImage(id, image.id, { intendedSection: e.target.value }))} placeholder="Phần bài phù hợp, ví dụ: Công nghệ IH" />
                   {image.role === "feature-small" && <input className="input" value={image.featureGroup} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, featureGroup: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-group-${image.id}`, () => updateJapanVipContentImage(id, image.id, { featureGroup: e.target.value }))} placeholder="Tên bảng gom, ví dụ: 6 công nghệ lõi" />}
                   <input className="input" value={image.caption} onChange={(e) => setDraft((current) => current ? { ...current, images: current.images.map((item) => item.id === image.id ? { ...item, caption: e.target.value } : item) } : current)} onBlur={(e) => void run(`image-caption-${image.id}`, () => updateJapanVipContentImage(id, image.id, { caption: e.target.value }))} placeholder="Chú thích giải thích đúng điều ảnh đang chứng minh" />
