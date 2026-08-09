@@ -56,6 +56,8 @@ export interface JapanVipReferenceArticle {
     changes: Array<{ id: string; before: string; after: string; reason: string }>;
     improvedText: string;
     review: JapanVipLearningReview | null;
+    provider?: "ollama-cloud" | "codex";
+    round?: number;
     createdAt: string;
   } | null;
   approvedVariant?: "original" | "improved";

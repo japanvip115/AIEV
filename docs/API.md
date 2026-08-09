@@ -1205,7 +1205,7 @@ GET    /api/japanvip-learning
 POST   /api/japanvip-learning/articles               { url, kind, tags? }
 POST   /api/japanvip-learning/japanvip-articles       { url, tags? }
 POST   /api/japanvip-learning/articles/:articleId/hermes-review
-POST   /api/japanvip-learning/articles/:articleId/improve
+POST   /api/japanvip-learning/articles/:articleId/improve       { aiProvider?: "ollama-cloud"|"codex" }
 POST   /api/japanvip-learning/articles/:articleId/improvement-review
 POST   /api/japanvip-learning/articles/:articleId/approve
 POST   /api/japanvip-learning/articles/:articleId/reject
@@ -1219,6 +1219,7 @@ DELETE /api/japanvip-learning/rules/:ruleId
 Bài nhập qua `japanvip-articles` phải thuộc tên miền `japanvip.vn`, được Ollama Cloud (`OLLAMA_CLOUD_MODEL`, mặc định GPT-OSS 120B) chấm 6 tiêu chí và mặc định ở trạng thái chờ duyệt. Nếu Ollama Cloud lỗi hoặc trả sai schema, hệ thống tự chuyển sang Hermes CLI và ghi rõ evaluator trong kết quả. API `approve` chỉ chấp nhận khi tổng điểm từ 85/100 và tiêu chí độ chính xác từ 80/100; bài đã duyệt được tự động ưu tiên làm nguồn phong cách nội bộ, nhưng không thay thế nguồn hãng cho thông số/claim sản phẩm.
 
 - Bài Japan VIP đạt từ 75 điểm nhưng chưa qua đủ hai điều kiện duyệt có thể gọi `improve` để tạo **bản cải thiện riêng** — kể cả khi tổng đã ≥85 nhưng độ chính xác còn <80. Hệ thống chỉ nhận tối đa 8 thay đổi khớp chính xác, tổng phần bị thay không quá 35% và không sửa trường `text` của bài mẫu gốc. `improvement-review` chấm riêng bản cải thiện; nếu vẫn chưa đạt thì có thể cải thiện tiếp trên biến thể này. Khi đạt ngưỡng, `approve` duyệt biến thể làm nguồn trong khi bản gốc vẫn được lưu nguyên vẹn.
+- Mặc định vòng cải thiện 1-2 dùng Ollama Cloud để tiết kiệm hạn mức; từ vòng 3 hệ thống đề xuất Codex/ChatGPT. UI vẫn cho chọn lại `ollama-cloud` hoặc `codex` trước mỗi vòng. Giám khảo tiếp tục là Ollama Cloud/Hermes để tách vai trò viết và chấm.
 
 - `kind`: `competitor`, `inspiration` hoặc `japanvip`.
 - GPT qua Codex CLI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận

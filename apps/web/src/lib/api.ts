@@ -3117,6 +3117,8 @@ export interface JapanVipReferenceArticle {
     changes: Array<{ id: string; before: string; after: string; reason: string }>;
     improvedText: string;
     review: JapanVipReferenceArticle["hermesReview"];
+    provider?: "ollama-cloud" | "codex";
+    round?: number;
     createdAt: string;
   } | null;
   approvedVariant?: "original" | "improved";
@@ -3168,8 +3170,8 @@ export const addJapanVipOwnedArticle = (input: { url: string; tags?: string[] })
 export const reviewJapanVipOwnedArticle = (id: string) =>
   post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/hermes-review`);
 
-export const improveJapanVipOwnedArticle = (id: string) =>
-  post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/improve`);
+export const improveJapanVipOwnedArticle = (id: string, aiProvider: "ollama-cloud" | "codex") =>
+  post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/improve`, { aiProvider });
 
 export const reviewJapanVipOwnedImprovement = (id: string) =>
   post<JapanVipLearningLibrary>(`/api/japanvip-learning/articles/${encodeURIComponent(id)}/improvement-review`);

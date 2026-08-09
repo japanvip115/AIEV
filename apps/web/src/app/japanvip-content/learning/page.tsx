@@ -56,6 +56,7 @@ export default function JapanVipLearningPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
+  const [improvementProviders, setImprovementProviders] = useState<Record<string, "ollama-cloud" | "codex">>({});
 
   const load = useCallback(async () => {
     try {
@@ -155,6 +156,9 @@ export default function JapanVipLearningPage() {
               const passesGate = Boolean(approvalReview && approvalReview.totalScore >= 85 && approvalReview.accuracyScore >= 80);
               const originalPassesGate = Boolean(review && review.totalScore >= 85 && review.accuracyScore >= 80);
               const canImprove = Boolean(approvalReview && approvalReview.totalScore >= 75 && !passesGate && article.approvalStatus !== "approved");
+              const improvementRound = article.improvementDraft?.round ?? 0;
+              const recommendedImprovementProvider: "ollama-cloud" | "codex" = improvementRound >= 2 ? "codex" : "ollama-cloud";
+              const selectedImprovementProvider = improvementProviders[article.id] ?? recommendedImprovementProvider;
               return (
               <details key={article.id} open={openArticleId === article.id} className="group overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]">
                 <summary onClick={(event) => { event.preventDefault(); setOpenArticleId((current) => current === article.id ? null : article.id); }} className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--surface-subtle)] [&::-webkit-details-marker]:hidden">
@@ -216,7 +220,8 @@ export default function JapanVipLearningPage() {
                           <div><div className="flex items-baseline gap-2"><span className={`text-2xl font-bold ${originalPassesGate ? "text-emerald-600" : "text-amber-600"}`}>{review.totalScore}/100</span><span className="text-xs text-[var(--text-muted)]">Độ chính xác {review.accuracyScore}/100</span></div>{review.evaluator && <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{review.evaluator.fallback ? `Dự phòng: Hermes · ${review.evaluator.model}` : `Chấm bởi Ollama Cloud · ${review.evaluator.model}`}</p>}</div>
                           <div className="flex flex-wrap gap-2">
                             <Button small variant="secondary" disabled={busy !== null} title="Chấm lại nguyên văn bài mẫu đã sao chép" onClick={() => void run(`review-${article.id}`, () => reviewJapanVipOwnedArticle(article.id))}><RotateCcw size={13} /> Chấm lại bài gốc</Button>
-                            {canImprove && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`improve-${article.id}`, () => improveJapanVipOwnedArticle(article.id))}><Sparkles size={13} /> {busy === `improve-${article.id}` ? "Đang sửa chọn lọc…" : article.improvementDraft?.review ? "Cải thiện tiếp điểm còn yếu" : article.improvementDraft ? "Tạo lại bản cải thiện" : "Cải thiện phần điểm thấp"}</Button>}
+                            {canImprove && <select className="input h-8 min-h-0 w-auto py-1 text-xs" aria-label={`AI cải thiện ${article.title}`} value={selectedImprovementProvider} disabled={busy !== null} onChange={(event) => setImprovementProviders((current) => ({ ...current, [article.id]: event.target.value as "ollama-cloud" | "codex" }))}><option value="ollama-cloud">Ollama Cloud · tiết kiệm</option><option value="codex">ChatGPT · chất lượng cao</option></select>}
+                            {canImprove && <Button small variant={improvementRound >= 2 ? "primary" : "secondary"} disabled={busy !== null} onClick={() => void run(`improve-${article.id}`, async () => { const next = await improveJapanVipOwnedArticle(article.id, selectedImprovementProvider); setImprovementProviders((current) => { const copy = { ...current }; delete copy[article.id]; return copy; }); return next; })}><Sparkles size={13} /> {busy === `improve-${article.id}` ? `${selectedImprovementProvider === "codex" ? "ChatGPT" : "Ollama"} đang cải thiện…` : article.improvementDraft?.review ? "Cải thiện tiếp điểm còn yếu" : article.improvementDraft ? "Tạo lại bản cải thiện" : "Cải thiện phần điểm thấp"}</Button>}
                             {article.approvalStatus !== "rejected" && <Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`reject-${article.id}`, () => rejectJapanVipOwnedArticle(article.id))}><XCircle size={13} /> Loại</Button>}
                             {article.approvalStatus !== "approved" && <Button small disabled={busy !== null || !passesGate} title={!passesGate ? "Cần tổng ≥85 và độ chính xác ≥80" : undefined} onClick={() => void run(`approve-${article.id}`, () => approveJapanVipOwnedArticle(article.id))}><CheckCircle2 size={13} /> {article.improvementDraft?.review ? "Duyệt bản cải thiện" : "Duyệt làm nguồn"}</Button>}
                           </div>
@@ -231,12 +236,13 @@ export default function JapanVipLearningPage() {
                             <p className="mt-1">Độ chính xác đang là {approvalReview.accuracyScore}/100, cần tối thiểu 80. Hãy bấm <strong>Cải thiện phần điểm thấp</strong>; AI chỉ xử lý claim hoặc câu chưa đủ căn cứ, không viết lại bài và không sửa bài mẫu gốc.</p>
                           </div>
                         )}
+                        {canImprove && improvementRound >= 2 && <p className="mt-3 rounded-[var(--radius)] bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">Bài đã cải thiện {improvementRound} vòng bằng AI. Hệ thống đề xuất chuyển sang ChatGPT để thoát khỏi vùng điểm đang bị lặp.</p>}
                         {article.improvementDraft && (
                           <div className="mt-3 rounded-[var(--radius)] border-2 border-emerald-300 bg-emerald-50/60 p-3">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div>
                                 <p className="flex items-center gap-2 font-semibold text-emerald-800"><ShieldCheck size={16} /> Bản cải thiện riêng · bản gốc được khóa</p>
-                                <p className="mt-1 text-xs text-emerald-800/80">Chỉ thay {article.improvementDraft.changes.length} đoạn điểm thấp. Nội dung bài mẫu đã sao chép không bị sửa.</p>
+                                <p className="mt-1 text-xs text-emerald-800/80">Vòng {article.improvementDraft.round ?? 1} · {article.improvementDraft.provider === "codex" ? "ChatGPT/Codex" : "Ollama Cloud"} · chỉ thay {article.improvementDraft.changes.length} đoạn điểm thấp. Nội dung bài mẫu đã sao chép không bị sửa.</p>
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
                                 {article.improvementDraft.review && <span className={`text-lg font-bold ${passesGate ? "text-emerald-700" : "text-amber-700"}`}>{article.improvementDraft.review.totalScore}/100 <span className="text-xs font-normal">· chính xác {article.improvementDraft.review.accuracyScore}</span></span>}

@@ -198,6 +198,11 @@ router.post("/articles/:articleId/improve", async (req, res) => {
   if (!article || article.kind !== "japanvip") throw new HttpError(404, "JAPANVIP_REFERENCE_NOT_FOUND", "Không tìm thấy bài Japan VIP");
   const currentReview = article.improvementDraft?.review ?? article.hermesReview;
   const currentText = article.improvementDraft?.review ? article.improvementDraft.improvedText : article.text;
+  const previousRound = article.improvementDraft?.round ?? 0;
+  const requestedProvider = (req.body as Record<string, unknown> | undefined)?.aiProvider;
+  const improvementProvider = requestedProvider === "codex" || requestedProvider === "ollama-cloud"
+    ? requestedProvider
+    : previousRound >= 2 ? "codex" : "ollama-cloud";
   const alreadyPasses = Boolean(currentReview && currentReview.totalScore >= JAPANVIP_APPROVAL_SCORE && currentReview.accuracyScore >= JAPANVIP_ACCURACY_SCORE);
   if (!currentReview || currentReview.totalScore < 75 || alreadyPasses) throw new HttpError(409, "NOT_NEAR_APPROVAL", "Chỉ cải thiện chọn lọc bài gần đạt nhưng chưa qua điều kiện duyệt");
   const lowFeedback = currentReview.criteria.filter((item) => item.score < 85).map((item) => `- ${item.label} ${item.score}/100: ${item.feedback}`).join("\n");
@@ -208,10 +213,12 @@ router.post("/articles/:articleId/improve", async (req, res) => {
     `ĐIỂM CẦN CẢI THIỆN:\n${lowFeedback}`,
     `BẢN ĐANG CẢI THIỆN (bài mẫu gốc vẫn bất biến):\n${currentText.slice(0, 60_000)}`,
   ].join("\n\n");
-  const ai = await generateOllamaCloudText({ prompt, usageTag: "japanvip-selective-improvement", jsonMode: true });
+  const ai = improvementProvider === "codex"
+    ? await generateJapanVipText("codex", { prompt, usageTag: "japanvip-selective-improvement" })
+    : await generateOllamaCloudText({ prompt, usageTag: "japanvip-selective-improvement", jsonMode: true });
   const parsed = extractJson<Record<string, unknown>>(ai.text);
   const built = buildImprovedCopy(currentText, parsed?.changes);
-  article.improvementDraft = { id: nanoid(10), ...built, review: null, createdAt: nowIso() };
+  article.improvementDraft = { id: nanoid(10), ...built, review: null, provider: improvementProvider, round: previousRound + 1, createdAt: nowIso() };
   article.approvalStatus = "pending"; article.active = false; article.updatedAt = nowIso();
   writeJapanVipLearningLibrary(library);
   res.json(publicLibrary());
