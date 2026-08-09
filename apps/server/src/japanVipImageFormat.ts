@@ -84,6 +84,42 @@ export function resolveImageFormat(image: Pick<JapanVipContentImage, "width" | "
   };
 }
 
+/**
+ * Chú thích có thực sự nói về TẤM ẢNH NÀY không.
+ *
+ * "Ảnh tính năng nhỏ", "Giới thiệu tính năng", "Ảnh chính thức từ hãng" là nhãn
+ * dán cho có - đặt dưới một hàng bốn ảnh thì bốn dòng giống hệt nhau, người đọc
+ * không biết được tấm nào chứng minh điều gì. Ảnh không có chú thích đúng ngữ
+ * cảnh thì không được lên bài.
+ */
+const GENERIC_CAPTIONS = [
+  "anh tinh nang nho", "anh tinh nang", "gioi thieu tinh nang", "tinh nang",
+  "anh san pham", "anh san pham chinh", "hinh anh san pham", "anh chinh thuc tu hang",
+  "anh chinh thuc", "anh minh hoa", "anh hero", "anh chi tiet", "chi tiet san pham",
+  "anh goc khac", "anh kich thuoc", "anh ve sinh", "hinh anh", "anh",
+];
+
+function normalizeCaption(value: string): string {
+  return value
+    .toLocaleLowerCase("vi")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function captionOf(image: Pick<JapanVipContentImage, "caption" | "altText">): string {
+  return (image.caption || image.altText || "").trim();
+}
+
+export function hasContextCaption(image: Pick<JapanVipContentImage, "caption" | "altText">): boolean {
+  const text = normalizeCaption(captionOf(image));
+  if (text.length < 10) return false;
+  return !GENERIC_CAPTIONS.includes(text);
+}
+
 const ROLE_PRIORITY: Partial<Record<JapanVipImageRole, number>> = { hero: 3, "main-packshot": 2, dimensions: 2 };
 
 /**

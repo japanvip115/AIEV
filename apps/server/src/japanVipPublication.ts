@@ -10,7 +10,9 @@ import {
   type JapanVipReferenceArticle,
 } from "./japanVipLearning.js";
 import {
+  captionOf,
   dedupeVariants,
+  hasContextCaption,
   resolveImageFormat,
   type JapanVipImageLayout,
   type ResolvedFormat,
@@ -291,15 +293,25 @@ function figureStyle(resolved: ResolvedFormat, image: ArticleImage): string {
   ].join(";");
 }
 
-function renderFigure(image: ArticleImage): string {
+function renderFigure(image: ArticleImage, inCell = false): string {
   const src = safeHttpUrl(image.url);
   if (!src) return "";
   const resolved = resolveImageFormat(image);
-  const alt = escapeHtml(image.altText || image.caption || image.role);
-  const caption = escapeHtml(image.caption || image.altText || "Ảnh chính thức từ hãng");
+  const alt = escapeHtml(captionOf(image) || image.role);
   const size = image.width && image.height ? ` width="${image.width}" height="${image.height}"` : "";
-  const figureStyleAttr = resolved.layout === "full" ? "margin:0 0 26px" : "margin:0";
-  return `<figure style="${figureStyleAttr}"><img src="${src}" alt="${alt}"${size} loading="lazy" decoding="async" style="${figureStyle(resolved, image)}"><figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${caption}</figcaption></figure>`;
+  // Chú thích chung chung thì KHÔNG in ra. Một dòng "Ảnh chính thức từ hãng"
+  // dưới mỗi ảnh không nói gì về tấm ảnh, chỉ làm bài dài thêm.
+  const caption = hasContextCaption(image)
+    ? `<figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${escapeHtml(captionOf(image))}</figcaption>`
+    : "";
+  // Trong ô lưới thì ảnh lấp đầy ô đã có sẵn kích thước; ngoài lưới thì tự mang
+  // chiều rộng của mình.
+  const style = inCell
+    ? "display:block;width:100%;height:100%;object-fit:contain;border-radius:14px"
+    : figureStyle(resolved, image);
+  const margin = inCell ? "margin:0" : resolved.layout === "full" ? "margin:0 0 26px" : "margin:0";
+  return `<figure style="${margin}"><img src="${src}" alt="${alt}"${size} loading="lazy" decoding="async" style="${style}"><figcaption-placeholder></figure>`
+    .replace("<figcaption-placeholder>", caption);
 }
 
 /** Ảnh lạ (AI chèn URL ngoài manifest): vẫn hiện, nhưng không đoán khổ bừa. */
@@ -316,17 +328,31 @@ const PER_ROW: Record<JapanVipImageLayout, number> = { full: 1, solo: 1, "grid-2
  */
 function renderGroup(images: ArticleImage[]): string {
   if (!images.length) return "";
-  const figures = images.map((image) => renderFigure(image)).filter(Boolean);
-  if (figures.length <= 1) return figures.length ? `<div style="margin:26px 0">${figures[0]}</div>` : "";
+  if (images.length === 1) {
+    const only = renderFigure(images[0]);
+    return only ? `<div style="margin:26px 0">${only}</div>` : "";
+  }
   const perRow = PER_ROW[resolveImageFormat(images[0]).layout] ?? 2;
+  // MỌI Ô CÙNG MỘT KHUÔN VUÔNG, ảnh căn giữa bên trong.
+  // Trước đây mỗi ô cao theo đúng ảnh của nó, nên một ảnh dọc đứng cạnh một ảnh
+  // ngang là hàng lệch hẳn đi. Ô vuông cố định thì hàng nào cũng đều, mà ảnh vẫn
+  // giữ nguyên tỉ lệ và không bị cắt vì object-fit:contain.
+  const basis = `calc(${(100 / perRow).toFixed(4)}% - ${Math.round((14 * (perRow - 1)) / perRow)}px)`;
+  const minWidth = perRow >= 4 ? 140 : 240;
+  const cells = images
+    .map((image) => renderFigure(image, true))
+    .filter(Boolean)
+    .map((figure) => {
+      const [, img = "", cap = ""] = figure.match(/^<figure[^>]*>(<img[^>]*>)(.*)<\/figure>$/s) ?? [];
+      return `<div style="flex:1 1 ${basis};min-width:${minWidth}px"><div style="aspect-ratio:1;background:#f8fafc;border-radius:14px;display:flex;align-items:center;justify-content:center;padding:8px;overflow:hidden">${img}</div>${cap}</div>`;
+    })
+    .join("");
   // flex chứ không phải grid: `flex-basis` theo % cộng `min-width` cho đúng SỐ
   // ẢNH MỘT HÀNG trên màn rộng rồi tự rút bớt cột trên điện thoại - grid
   // auto-fit thì nhồi thêm cột khi còn chỗ, không giữ được đúng 4.
-  const basis = `calc(${(100 / perRow).toFixed(4)}% - ${Math.round((14 * (perRow - 1)) / perRow)}px)`;
-  const minWidth = perRow >= 4 ? 140 : 240;
-  const cells = figures.map((figure) => `<div style="flex:1 1 ${basis};min-width:${minWidth}px">${figure}</div>`).join("");
-  return `<div style="display:flex;flex-wrap:wrap;gap:14px;margin:26px 0">${cells}</div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:14px;margin:26px 0;align-items:flex-start">${cells}</div>`;
 }
+
 
 export function buildJapanVipArticleHtml(project: JapanVipContentProject): string {
   assertApprovedBase(project);
