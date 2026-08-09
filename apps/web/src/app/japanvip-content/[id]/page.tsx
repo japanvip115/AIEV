@@ -442,6 +442,7 @@ export default function JapanVipContentDetailPage() {
               <p className="py-6 text-center text-sm text-[var(--text-muted)]">Sau khi viết bài, dùng Hermes làm giám khảo độc lập. Nhận xét chưa tự động trở thành quy tắc chung.</p>
             ) : (() => {
               const review = draft.hermesReviews[0];
+              const suggestedRules = review.suggestedRules.filter((rule) => !/\[CẦN KIỂM CHỨNG\]/i.test(rule));
               return <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border-2 border-[var(--primary)] bg-[var(--surface-subtle)] p-4">
                   <div className="text-4xl font-bold text-[var(--primary)]">{review.totalScore}<span className="text-base text-[var(--text-muted)]">/100</span></div>
@@ -511,7 +512,7 @@ export default function JapanVipContentDetailPage() {
                     })}
                   </div>
                 </div>}
-                {review.suggestedRules.length > 0 && <div className="border-t border-[var(--border)] pt-4"><p className="font-semibold">Quy tắc Hermes đề xuất — chỉ lưu khi bạn duyệt</p><div className="mt-2 flex flex-col gap-2">{review.suggestedRules.map((rule) => <div key={rule} className="flex items-start justify-between gap-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm"><span>{rule}</span><Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`hermes-rule-${rule}`, async () => { const next = await addJapanVipContentFeedback(id, { category: "Hermes đề xuất", note: rule, saveAsRule: true }); setLearning(await getJapanVipLearningLibrary()); return next; })}>Duyệt & lưu</Button></div>)}</div></div>}
+                {suggestedRules.length > 0 && <div className="border-t border-[var(--border)] pt-4"><p className="font-semibold">Quy tắc Hermes đề xuất — chỉ lưu khi bạn duyệt</p><div className="mt-2 flex flex-col gap-2">{suggestedRules.map((rule) => <div key={rule} className="flex items-start justify-between gap-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] p-3 text-sm"><span>{rule}</span><Button small variant="secondary" disabled={busy !== null} onClick={() => void run(`hermes-rule-${rule}`, async () => { const next = await addJapanVipContentFeedback(id, { category: "Hermes đề xuất", note: rule, saveAsRule: true }); setLearning(await getJapanVipLearningLibrary()); return next; })}>Duyệt & lưu</Button></div>)}</div></div>}
               </div>;
             })()}
           </Card>
