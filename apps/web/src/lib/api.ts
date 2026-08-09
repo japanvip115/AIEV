@@ -2997,6 +2997,9 @@ export const createJapanVipContentProject = (input: {
   primaryUrl?: string;
 }) => post<JapanVipContentProject>("/api/japanvip-content", input);
 
+export const createAutomaticJapanVipContent = (input: { url: string; aiProvider?: "codex" | "ollama-cloud" }) =>
+  post<JapanVipContentProject>("/api/japanvip-content/auto", input);
+
 export const updateJapanVipContentProject = (
   id: string,
   patch: Partial<

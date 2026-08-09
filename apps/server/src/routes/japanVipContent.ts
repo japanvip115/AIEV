@@ -20,6 +20,7 @@ import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary, writeJapanVipLearningLibrary } from "../japanVipLearning.js";
 import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
+import { researchOfficialProduct } from "../officialProductResearch.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -153,6 +154,77 @@ router.post("/", (req, res) => {
     primaryUrl: typeof body.primaryUrl === "string" ? body.primaryUrl : "",
   });
   res.status(201).json(project);
+});
+
+router.post("/auto", async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  if (!url) throw new HttpError(400, "INVALID_OFFICIAL_URL", "Hãy dán URL sản phẩm chính hãng");
+  const pages = await researchOfficialProduct(url);
+  const primary = pages[0];
+  const project = createJapanVipContent({ name: primary.title, primaryUrl: primary.url });
+  project.aiProvider = parseJapanVipAiProvider(body.aiProvider, "codex");
+  project.sources = pages.map((page) => ({
+    id: nanoid(10), url: page.url, canonicalUrl: page.url, title: page.title,
+    siteName: page.siteName, lang: page.lang, leadImage: page.leadImage,
+    text: page.text.slice(0, 50_000), fetchedAt: nowIso(),
+  }));
+  project.selectedReferenceIds = readJapanVipLearningLibrary().articles
+    .filter((article) => article.kind === "japanvip" && article.approvalStatus === "approved" && article.active)
+    .map((article) => article.id)
+    .slice(0, 12);
+  project.status = "researching";
+  project.notes = `Tạo tự động từ nguồn hãng: ${primary.url}. Đã thu thập ${pages.length} trang hãng và chọn ${project.selectedReferenceIds.length} bài Japan VIP đã duyệt làm mẫu phong cách.`;
+  try {
+    const discovered = await discoverJapanVipImages(primary.url);
+    project.images = discovered.images.slice(0, 120).map((image) => ({
+      id: nanoid(10), url: image.url, sourcePageUrl: discovered.pageUrl, sourceType: "official" as const,
+      rightsBasis: "admin-attested-authorized-reseller", status: "pending" as const, role: "feature" as const,
+      altText: image.alt.slice(0, 180), caption: "", intendedSection: "", featureGroup: "",
+      width: image.width, height: image.height, discoveredAt: nowIso(),
+    }));
+  } catch {
+    // Ảnh là bước duyệt riêng; không chặn việc tạo nội dung từ nguồn chữ hợp lệ.
+  }
+  writeJapanVipContent(project);
+  try {
+    const prompt = [
+      "Bạn là Codex, biên tập viên chịu trách nhiệm cuối cùng cho japanvip.vn.",
+      "Từ duy nhất gói nguồn chính hãng bên dưới, hãy nhận diện chính xác loại sản phẩm, thương hiệu, model/suffix; sau đó tạo dàn ý và bài Markdown tiếng Việt hoàn chỉnh trong MỘT lượt để tiết kiệm hạn mức.",
+      "Bài Japan VIP đã duyệt chỉ dùng để học giọng tư vấn, cấu trúc và cách giải thích. Không sao chép câu chữ và không lấy chúng làm nguồn thông số.",
+      "Không bịa giá, tồn kho, bảo hành, chứng nhận, trải nghiệm sử dụng hay công dụng. Claim chưa đủ điều kiện phải ghi [CẦN KIỂM CHỨNG].",
+      "Nếu không xác định chắc chắn model từ nguồn hãng, để productModel rỗng; hệ thống sẽ dừng để người dùng kiểm tra.",
+      "Trả JSON thuần: {\"name\":\"loại sản phẩm + thương hiệu + model\",\"productModel\":\"\",\"targetKeyword\":\"\",\"outline\":\"Markdown H2/H3\",\"article\":\"bài Markdown hoàn chỉnh\"}.",
+      japanVipLearningContext(project.selectedReferenceIds),
+      researchContext(project),
+    ].join("\n\n");
+    const ai = await generateJapanVipText(project.aiProvider, { prompt, usageTag: "japanvip-auto-official", projectId: project.id, timeoutMs: 7 * 60_000 });
+    const parsed = extractJson<Record<string, unknown>>(ai.text);
+    const name = typeof parsed?.name === "string" ? parsed.name.trim() : "";
+    const productModel = typeof parsed?.productModel === "string" ? parsed.productModel.trim() : "";
+    const targetKeyword = typeof parsed?.targetKeyword === "string" ? parsed.targetKeyword.trim() : "";
+    const outline = typeof parsed?.outline === "string" ? parsed.outline.trim() : "";
+    const article = typeof parsed?.article === "string" ? parsed.article.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/```$/, "").trim() : "";
+    if (!name || !productModel) throw new HttpError(422, "AUTO_IDENTITY_UNCERTAIN", `Đã tạo project “${project.name}” nhưng chưa khóa được model chính xác; hãy kiểm tra nguồn trước khi viết`);
+    if (outline.length < 80 || article.length < 500) throw new HttpError(502, "AUTO_CONTENT_INCOMPLETE", `Đã tạo project “${project.name}” nhưng AI chưa trả đủ dàn ý và bài viết`);
+    const copiedExcerpt = findCopiedReferenceExcerpt(article, project.selectedReferenceIds);
+    if (copiedExcerpt) throw new HttpError(502, "AUTO_ARTICLE_TOO_SIMILAR", "Bài tự động lặp một câu dài từ bài mẫu nên đã bị chặn");
+    project.name = name;
+    project.productModel = productModel;
+    project.targetKeyword = targetKeyword || name;
+    project.outline = outline;
+    project.article = article;
+    project.status = "review";
+    project.notes += " Nội dung đã tạo xong và đang chờ kiểm tra claim, ảnh và Hermes trước khi duyệt.";
+    writeJapanVipContent(project);
+    res.status(201).json(project);
+  } catch (error) {
+    project.status = "researching";
+    project.notes += ` Quy trình tự động đã dừng: ${error instanceof Error ? error.message : String(error)}`;
+    writeJapanVipContent(project);
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, "AUTO_CONTENT_FAILED", `Đã lưu project “${project.name}” nhưng AI chưa hoàn tất: ${error instanceof Error ? error.message : String(error)}`);
+  }
 });
 
 router.get("/:id", (req, res) => res.json(readJapanVipContent(req.params.id)));

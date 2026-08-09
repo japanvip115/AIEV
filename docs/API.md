@@ -1180,6 +1180,7 @@ Mô-đun biên tập bài sản phẩm tách biệt với Videos Project. Dữ l
 ```text
 GET    /api/japanvip-content
 POST   /api/japanvip-content
+POST   /api/japanvip-content/auto                    { url, aiProvider?: "codex"|"ollama-cloud" }
 GET    /api/japanvip-content/:id
 PATCH  /api/japanvip-content/:id
 DELETE /api/japanvip-content/:id
@@ -1193,6 +1194,7 @@ POST   /api/japanvip-content/:id/feedback            { category, note, saveAsRul
 ```
 
 - Nguồn URL đi qua cùng lớp `safeFetchHtml` và Readability của Text to video.
+- `POST /auto` nhận một URL sản phẩm hãng, thu thập trang chính và tối đa ba trang tính năng cùng tên miền, tự chọn các bài Japan VIP đã duyệt làm mẫu phong cách, rồi dùng một lượt AI để khóa model, tạo dàn ý và bài Markdown. Ảnh hãng chỉ được lưu ở trạng thái chờ duyệt và quy trình dừng ở bản nháp nội bộ.
 - Fact sheet do người dùng nhập/duyệt là nguồn sự thật ưu tiên cho AI.
 - AI tạo dàn ý và bài Markdown bằng Codex CLI dùng phiên ChatGPT hiện tại; claim thiếu bằng chứng phải giữ
   nhãn `[CẦN KIỂM CHỨNG]`.
