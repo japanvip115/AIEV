@@ -9,6 +9,15 @@ import {
   type JapanVipLearningReview,
   type JapanVipReferenceArticle,
 } from "./japanVipLearning.js";
+import {
+  applyHardRules,
+  dedupeVariants,
+  readImageFormatConfig,
+  resolveImageFormat,
+  type JapanVipImageFormatConfig,
+  type JapanVipImageLayout,
+  type ResolvedFormat,
+} from "./japanVipImageFormat.js";
 import { HttpError, nowIso, toKebabAscii } from "./util.js";
 
 const MIN_REVIEW_SCORE = 85;
@@ -170,7 +179,17 @@ function markdownTable(lines: string[]): string {
   return `<div class="jv-table-wrap"><table><thead><tr>${head.map((cell) => `<th>${cell}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 
-function markdownToHtml(markdown: string): string {
+/** URL chuẩn hóa để tra ngược ảnh AI chèn trong Markdown về đúng ảnh trong kho. */
+function imageKey(url: string): string {
+  return url.trim().replace(/[?#].*$/, "").replace(/\/$/, "").toLowerCase();
+}
+
+function markdownToHtml(
+  markdown: string,
+  config: JapanVipImageFormatConfig,
+  byUrl: Map<string, ArticleImage> = new Map(),
+  used?: Set<string>
+): string {
   const lines = markdown.replace(/\r/g, "").split("\n");
   const out: string[] = [];
   let index = 0;
@@ -217,7 +236,18 @@ function markdownToHtml(markdown: string): string {
     const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
     if (image) {
       const src = safeHttpUrl(image[2]);
-      if (src) out.push(`<figure><img src="${src}" alt="${escapeHtml(image[1])}" loading="lazy"><figcaption>${escapeHtml(image[1])}</figcaption></figure>`);
+      if (src) {
+        // Ảnh AI chèn trong bài trước đây ra <figure> TRẦN - mất sạch vai trò,
+        // nên khổ ảnh chỉ áp được cho ảnh hệ thống tự bố trí. Tra ngược URL về
+        // ảnh trong kho là chỗ duy nhất đưa detail/maintenance vào đúng khổ.
+        const known = byUrl.get(imageKey(image[2]));
+        if (known) {
+          used?.add(known.id);
+          out.push(`<div style="margin:26px 0">${renderFigure(known, config)}</div>`);
+        } else {
+          out.push(renderUnknownFigure(src, image[1]));
+        }
+      }
       index += 1;
       continue;
     }
@@ -232,41 +262,125 @@ function markdownToHtml(markdown: string): string {
   return out.join("\n");
 }
 
-function imageFigure(image: JapanVipContentProject["images"][number], className = ""): string {
+type ArticleImage = JapanVipContentProject["images"][number];
+
+/**
+ * VÌ SAO KHỔ ẢNH VIẾT THẲNG VÀO `style` CHỨ KHÔNG PHẢI CLASS + STYLESHEET:
+ * `article.html` trong gói đăng là FRAGMENT dán vào CMS japanvip.vn, còn thẻ
+ * <style> thì chỉ nằm trong preview.html. Bố cục viết bằng class sống đúng ở bản
+ * xem trước rồi chết ngay khi lên site thật - ảnh về mặc định của theme. Style
+ * inline thì fragment tự mang khổ của nó đi đâu cũng được.
+ *
+ * Lưới dùng `repeat(auto-fit, minmax(...))` để co về một cột trên điện thoại mà
+ * không cần media query - thứ duy nhất không viết inline được.
+ */
+function figureStyle(resolved: ResolvedFormat, image: ArticleImage): string {
+  const { preset } = resolved;
+  const parts = ["display:block", "width:100%", "height:auto", "border-radius:14px", "background:#f8fafc"];
+  // "Không phóng ảnh nguồn nhỏ": chặn bằng chính chiều rộng thật của ảnh.
+  if (image.width) parts.push(`max-width:min(100%,${image.width}px)`);
+  if (preset.aspectRatio !== null) {
+    parts.push(`aspect-ratio:${Number(preset.aspectRatio.toFixed(4))}`);
+    parts.push(`object-fit:${preset.fit}`);
+  }
+  return parts.join(";");
+}
+
+function renderFigure(image: ArticleImage, config: JapanVipImageFormatConfig): string {
   const src = safeHttpUrl(image.url);
   if (!src) return "";
+  const resolved = applyHardRules(resolveImageFormat(image, config), image);
   const alt = escapeHtml(image.altText || image.caption || image.role);
   const caption = escapeHtml(image.caption || image.altText || "Ảnh chính thức từ hãng");
-  return `<figure${className ? ` class="${className}"` : ""}><img src="${src}" alt="${alt}" loading="lazy"><figcaption>${caption}</figcaption></figure>`;
+  const size = image.width && image.height ? ` width="${image.width}" height="${image.height}"` : "";
+  const figureStyleAttr = resolved.layout === "full" ? "margin:0 0 26px" : "margin:0";
+  return `<figure style="${figureStyleAttr}"><img src="${src}" alt="${alt}"${size} loading="lazy" decoding="async" style="${figureStyle(resolved, image)}"><figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${caption}</figcaption></figure>`;
+}
+
+/** Ảnh lạ (AI chèn URL ngoài manifest): vẫn hiện, nhưng không đoán khổ bừa. */
+function renderUnknownFigure(src: string, alt: string): string {
+  return `<figure style="margin:26px 0"><img src="${src}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" style="display:block;width:100%;height:auto;border-radius:14px"><figcaption style="text-align:center;color:#64748b;font-size:13px;margin-top:8px">${escapeHtml(alt)}</figcaption></figure>`;
+}
+
+const GRID_MIN: Record<JapanVipImageLayout, number> = { full: 0, solo: 0, "grid-2": 320, "grid-3": 220 };
+
+/**
+ * Bọc một nhóm ảnh cùng vai trò thành lưới. Nhóm chỉ có MỘT ảnh thì không bọc -
+ * đó chính là ý "một ảnh lớn hoặc lưới 2", không cần thêm giá trị cấu hình.
+ */
+function renderGroup(images: ArticleImage[], config: JapanVipImageFormatConfig): string {
+  const usable = images;
+  if (!usable.length) return "";
+  const figures = usable.map((image) => renderFigure(image, config)).filter(Boolean);
+  if (figures.length <= 1) return figures.length ? `<div style="margin:26px 0">${figures[0]}</div>` : "";
+  const layout = applyHardRules(resolveImageFormat(usable[0], config), usable[0]).layout;
+  const min = GRID_MIN[layout] || 320;
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(${min}px,1fr));gap:14px;margin:26px 0">${figures.join("")}</div>`;
 }
 
 export function buildJapanVipArticleHtml(project: JapanVipContentProject): string {
   assertApprovedBase(project);
-  const approved = project.images.filter((image) => image.status === "approved");
-  const hero = approved.find((image) => image.role === "hero");
-  const packshot = approved.find((image) => image.role === "main-packshot");
-  const feature = approved.filter((image) => image.role === "feature");
-  const featureSmall = approved.filter((image) => image.role === "feature-small");
-  const installation = approved.filter((image) => image.role === "alternate-angle" || image.role === "dimensions");
-  let body = markdownToHtml(project.article.trim());
-  if (packshot) body = body.replace(/<\/p>/, `</p>${imageFigure(packshot, "jv-packshot")}`);
-  const featureGallery = [...feature.map((image) => imageFigure(image)), featureSmall.length ? `<div class="jv-feature-grid">${featureSmall.map((image) => imageFigure(image)).join("")}</div>` : ""].join("");
+  const config = readImageFormatConfig();
+  // Lọc bản trùng PC/mobile trên TOÀN BÀI, không phải trong từng nhóm: bản PC
+  // hay rơi vào vai trò hero còn bản mobile rơi vào lưới feature, lọc theo nhóm
+  // thì hai bản của cùng một hình vẫn cùng lên bài ở hai chỗ khác nhau.
+  const approved = dedupeVariants(project.images.filter((image) => image.status === "approved"));
+  const byUrl = new Map(approved.map((image) => [imageKey(image.url), image]));
+  // Ảnh AI đã tự chèn trong Markdown thì hệ thống KHÔNG bố trí lại lần nữa,
+  // nếu không cùng một hình xuất hiện hai lần trong bài.
+  const used = new Set<string>();
+  let body = markdownToHtml(project.article.trim(), config, byUrl, used);
+
+  const remaining = (role: ArticleImage["role"]) => approved.filter((image) => image.role === role && !used.has(image.id));
+  const hero = remaining("hero")[0];
+  const packshot = remaining("main-packshot")[0];
+  const feature = [...remaining("feature"), ...remaining("feature-small")];
+  const installation = [...remaining("alternate-angle"), ...remaining("dimensions")];
+
+  if (packshot) {
+    used.add(packshot.id);
+    body = body.replace(/<\/p>/, `</p><div style="margin:26px 0">${renderFigure(packshot, config)}</div>`);
+  }
+
+  const featureGallery = renderGroup(feature, config);
   if (featureGallery) {
+    for (const image of feature) used.add(image.id);
     const featureHeading = /(<h2>[^<]*(?:đáng chú ý|tính năng)[^<]*<\/h2>)/i;
-    body = featureHeading.test(body) ? body.replace(featureHeading, `$1<section class="jv-media-block">${featureGallery}</section>`) : `<section class="jv-media-block">${featureGallery}</section>${body}`;
+    body = featureHeading.test(body) ? body.replace(featureHeading, `$1${featureGallery}`) : `${featureGallery}${body}`;
   }
-  if (installation.length) {
+
+  const installGallery = renderGroup(installation, config);
+  if (installGallery) {
+    for (const image of installation) used.add(image.id);
     const installHeading = /(<h2>[^<]*(?:kiểm tra|lắp đặt)[^<]*<\/h2>)/i;
-    const gallery = `<div class="jv-install-grid">${installation.map((image) => imageFigure(image)).join("")}</div>`;
-    body = installHeading.test(body) ? body.replace(installHeading, `${gallery}$1`) : `${body}${gallery}`;
+    body = installHeading.test(body) ? body.replace(installHeading, `${installGallery}$1`) : `${body}${installGallery}`;
   }
-  return `<article class="jv-article">${hero ? imageFigure(hero, "jv-hero") : ""}${body}</article>`;
+
+  const heroHtml = hero ? renderFigure(hero, config) : "";
+  return `<article class="jv-article">${heroHtml}${body}</article>`;
 }
+
+/**
+ * Ảnh đã duyệt nhưng không xuất hiện trong bài.
+ *
+ * Không tự nhét vào - bài viết không bắt buộc dùng hết ảnh đã duyệt. Nhưng cũng
+ * không để nó biến mất trong im lặng: liệt kê ra lúc kiểm tra gói đăng.
+ */
+export function unusedApprovedImages(project: JapanVipContentProject): ArticleImage[] {
+  const config = readImageFormatConfig();
+  const approved = dedupeVariants(project.images.filter((image) => image.status === "approved"));
+  const byUrl = new Map(approved.map((image) => [imageKey(image.url), image]));
+  const used = new Set<string>();
+  markdownToHtml(project.article.trim(), config, byUrl, used);
+  const autoPlaced = new Set(["hero", "main-packshot", "alternate-angle", "feature", "feature-small", "dimensions"]);
+  return approved.filter((image) => !used.has(image.id) && !autoPlaced.has(image.role));
+}
+
 
 export function buildJapanVipPreviewHtml(project: JapanVipContentProject): string {
   const article = buildJapanVipArticleHtml(project);
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(project.name)} — Bản xem trước</title><style>
-  :root{color-scheme:light;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202124;background:#f4f5f7}*{box-sizing:border-box}body{margin:0}.jv-preview-head{padding:16px 22px;background:#111827;color:#fff;position:sticky;top:0;z-index:2}.jv-preview-head strong{display:block;font-size:15px}.jv-preview-head span{font-size:12px;color:#cbd5e1}.jv-shell{max-width:980px;margin:28px auto;padding:0 18px}.jv-title{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:0 0 24px}.jv-article{background:#fff;border-radius:18px;padding:clamp(20px,4vw,52px);box-shadow:0 12px 38px rgba(15,23,42,.08)}.jv-article h2{font-size:clamp(23px,3vw,32px);line-height:1.25;margin:42px 0 14px}.jv-article h3{font-size:21px;line-height:1.35;margin:30px 0 10px}.jv-article p,.jv-article li{font-size:17px;line-height:1.8}.jv-article ul,.jv-article ol{padding-left:24px}.jv-article a{color:#d9272e}.jv-article figure{margin:26px 0}.jv-article img{display:block;width:100%;height:auto;border-radius:14px;background:#f8fafc}.jv-article figcaption{text-align:center;color:#64748b;font-size:13px;margin-top:8px}.jv-hero{margin-top:0!important}.jv-callout{margin:28px 0;padding:20px 24px;border-left:5px solid #ef3e46;border-radius:12px;background:#fff1f2}.jv-callout p{margin-top:0;font-weight:700}.jv-table-wrap{overflow-x:auto;margin:24px 0}table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:13px 14px;border:1px solid #e2e8f0;text-align:left;vertical-align:top}th{background:#f8fafc}.jv-media-block{margin:22px 0}.jv-feature-grid,.jv-install-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.jv-feature-grid figure,.jv-install-grid figure{margin:0}.jv-feature-grid img{aspect-ratio:4/3;object-fit:contain}@media(max-width:680px){.jv-shell{padding:0;margin:0}.jv-article{border-radius:0;padding:22px}.jv-feature-grid,.jv-install-grid{grid-template-columns:1fr}.jv-preview-head{position:static}}
+  :root{color-scheme:light;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202124;background:#f4f5f7}*{box-sizing:border-box}body{margin:0}.jv-preview-head{padding:16px 22px;background:#111827;color:#fff;position:sticky;top:0;z-index:2}.jv-preview-head strong{display:block;font-size:15px}.jv-preview-head span{font-size:12px;color:#cbd5e1}.jv-shell{max-width:980px;margin:28px auto;padding:0 18px}.jv-title{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:0 0 24px}.jv-article{background:#fff;border-radius:18px;padding:clamp(20px,4vw,52px);box-shadow:0 12px 38px rgba(15,23,42,.08)}.jv-article h2{font-size:clamp(23px,3vw,32px);line-height:1.25;margin:42px 0 14px}.jv-article h3{font-size:21px;line-height:1.35;margin:30px 0 10px}.jv-article p,.jv-article li{font-size:17px;line-height:1.8}.jv-article ul,.jv-article ol{padding-left:24px}.jv-article a{color:#d9272e}.jv-article figure{margin:26px 0}.jv-article img{display:block;max-width:100%;height:auto;border-radius:14px;background:#f8fafc}.jv-article figcaption{text-align:center;color:#64748b;font-size:13px;margin-top:8px}.jv-hero{margin-top:0!important}.jv-callout{margin:28px 0;padding:20px 24px;border-left:5px solid #ef3e46;border-radius:12px;background:#fff1f2}.jv-callout p{margin-top:0;font-weight:700}.jv-table-wrap{overflow-x:auto;margin:24px 0}table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:13px 14px;border:1px solid #e2e8f0;text-align:left;vertical-align:top}th{background:#f8fafc}@media(max-width:680px){.jv-shell{padding:0;margin:0}.jv-article{border-radius:0;padding:22px}.jv-preview-head{position:static}}
   </style></head><body><div class="jv-preview-head"><strong>Bản xem trước HTML — chưa đăng lên website</strong><span>${escapeHtml(project.productModel)} · Hermes ${project.hermesReviews[0]?.totalScore ?? 0}/100 · ${project.images.filter((image) => image.status === "approved").length} ảnh đã duyệt</span></div><main class="jv-shell"><h1 class="jv-title">${escapeHtml(project.name)}</h1>${article}</main></body></html>`;
 }
 
@@ -275,11 +389,15 @@ export function prepareJapanVipPublicationPackage(project: JapanVipContentProjec
   const blockers = publicationBlockers(project);
   if (blockers.length) throw new HttpError(409, "JAPANVIP_PUBLICATION_BLOCKED", `Chưa thể tạo gói đăng: ${blockers.join("; ")}`);
   const slug = toKebabAscii(project.name).slice(0, 64) || project.id;
+  const unused = unusedApprovedImages(project);
   return {
     fileName: `${slug}-japanvip.zip`,
     fingerprint: publicationFingerprint(project),
     reviewScore: review.totalScore,
     approvedImageCount: project.images.filter((image) => image.status === "approved").length,
+    // Cảnh báo chứ không chặn: bài không bắt buộc dùng hết ảnh đã duyệt, nhưng
+    // ảnh rơi ra ngoài thì phải nhìn thấy được.
+    unusedImages: unused.map((image) => ({ id: image.id, role: image.role, altText: image.altText })),
     generatedAt: nowIso(),
   };
 }

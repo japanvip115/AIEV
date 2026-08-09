@@ -92,6 +92,8 @@ export interface JapanVipContentImage {
   featureGroup: string;
   width: number | null;
   height: number | null;
+  /** Khổ ép riêng cho đúng ảnh này; null = theo khổ mặc định của vai trò. */
+  formatPresetId?: string | null;
   selectionOrigin?: "manual" | "auto";
   selectionConfidence?: number | null;
   selectionReason?: string;
@@ -123,6 +125,8 @@ export interface JapanVipContentProject {
     fingerprint: string;
     reviewScore: number;
     approvedImageCount: number;
+    /** Ảnh đã duyệt nhưng không xuất hiện trong bài - cảnh báo, không phải lỗi. */
+    unusedImages?: Array<{ id: string; role: JapanVipImageRole; altText: string }>;
     generatedAt: string;
   } | null;
   createdAt: string;
@@ -144,6 +148,7 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
       selectionOrigin: image.selectionOrigin === "auto" ? "auto" : "manual",
       selectionConfidence: typeof image.selectionConfidence === "number" ? image.selectionConfidence : null,
       selectionReason: typeof image.selectionReason === "string" ? image.selectionReason : "",
+      formatPresetId: typeof image.formatPresetId === "string" && image.formatPresetId ? image.formatPresetId : null,
     })) : [],
   };
 }

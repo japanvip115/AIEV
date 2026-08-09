@@ -20,6 +20,14 @@ import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary, writeJapanVipLearningLibrary } from "../japanVipLearning.js";
 import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
+import {
+  applyHardRules,
+  defaultImageFormatConfig,
+  readImageFormatConfig,
+  resolveImageFormat,
+  writeImageFormatConfig,
+  type JapanVipImageFormatConfig,
+} from "../japanVipImageFormat.js";
 import { researchOfficialProduct } from "../officialProductResearch.js";
 import { applyLearnedImageSelection, getJapanVipImageLearningProfile, recordExplicitImageDecision, removeExplicitImageDecision } from "../japanVipImageLearning.js";
 import { approveJapanVipProjectAsLearning, buildJapanVipPreviewHtml, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
@@ -78,11 +86,16 @@ function omitUnverifiedLines(markdown: string): string {
 function imageWritingContext(project: JapanVipContentProject): string {
   const approved = project.images.filter((image) => image.status === "approved");
   if (!approved.length) return "Không có ảnh đã duyệt. Không tự chèn URL ảnh khác.";
+  const config = readImageFormatConfig();
   return [
-    "MANIFEST ẢNH ĐÃ DUYỆT (chỉ được dùng các URL này, mỗi URL đúng một lần):",
-    ...approved.map((image) => `- role=${image.role}; section=${image.intendedSection || "tự ghép theo ngữ cảnh"}; group=${image.featureGroup || "none"}; alt=${image.altText}; caption=${image.caption}; url=${image.url}`),
+    "MANIFEST ẢNH ĐÃ DUYỆT (chỉ được dùng các URL này, mỗi URL nhiều nhất một lần):",
+    ...approved.map((image) => {
+      const format = applyHardRules(resolveImageFormat(image, config), image);
+      return `- role=${image.role}; khổ=${format.preset.label}; bố cục=${format.layout}; section=${image.intendedSection || "tự ghép theo ngữ cảnh"}; group=${image.featureGroup || "none"}; alt=${image.altText}; caption=${image.caption}; url=${image.url}`;
+    }),
     "Ảnh hero đặt đầu bài. Ảnh feature/detail/dimensions/maintenance phải đặt sát phần nội dung thực sự giải thích đúng hình.",
-    "Các ảnh role=feature-small phải gom theo group thành một bảng HTML responsive duy nhất cho mỗi group; không rải từng ảnh nhỏ thành các khối riêng.",
+    "Chèn ảnh bằng cú pháp Markdown ![alt](url) trên một dòng riêng. Hệ thống tự áp khổ và bố cục theo bảng trên - KHÔNG tự viết thẻ HTML, style, width hay bảng để dàn ảnh.",
+    "KHÔNG bắt buộc dùng hết ảnh đã duyệt. Chỉ chèn ảnh nào thực sự minh họa cho đoạn văn quanh nó; ảnh không có chỗ đứng hợp lý thì bỏ qua.",
     "Không dùng ảnh pending/rejected, không lặp URL và không suy ra claim chỉ từ hình ảnh.",
   ].join("\n");
 }
@@ -178,6 +191,18 @@ router.post("/", (req, res) => {
 });
 
 router.get("/image-learning/profile", (_req, res) => res.json(getJapanVipImageLearningProfile()));
+
+router.get("/image-format", (_req, res) => res.json(readImageFormatConfig()));
+
+router.put("/image-format", (req, res) => {
+  const body = (req.body ?? {}) as Partial<JapanVipImageFormatConfig>;
+  if (!Array.isArray(body.presets) || !Array.isArray(body.roles)) {
+    throw new HttpError(400, "INVALID_IMAGE_FORMAT", "Cần đủ danh sách khổ và ánh xạ vai trò");
+  }
+  res.json(writeImageFormatConfig(body as JapanVipImageFormatConfig));
+});
+
+router.post("/image-format/reset", (_req, res) => res.json(writeImageFormatConfig(defaultImageFormatConfig())));
 
 router.post("/auto", async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
@@ -448,6 +473,11 @@ router.patch("/:id/images/:imageId", (req, res) => {
   if (typeof body.status === "string" && IMAGE_STATUSES.has(body.status as JapanVipImageStatus)) image.status = body.status as JapanVipImageStatus;
   if (typeof body.role === "string" && IMAGE_ROLES.has(body.role as JapanVipImageRole)) image.role = body.role as JapanVipImageRole;
   for (const key of ["altText", "caption", "intendedSection", "featureGroup"] as const) if (typeof body[key] === "string") image[key] = body[key].trim().slice(0, 500);
+  if (body.formatPresetId !== undefined) {
+    const presetId = typeof body.formatPresetId === "string" ? body.formatPresetId.trim() : "";
+    const known = readImageFormatConfig().presets.some((preset) => preset.id === presetId);
+    image.formatPresetId = presetId && known ? presetId : null;
+  }
   if (explicitDecision) {
     image.selectionOrigin = "manual";
     image.selectionConfidence = null;

@@ -30,6 +30,7 @@ import {
   type JapanVipAiStatus,
   type JapanVipReferenceKind,
 } from "@/lib/api";
+import { ImageFormatCard } from "../ImageFormatCard";
 import { AI_LABEL, AiProviderSelect } from "../shared";
 
 const KIND_LABEL: Record<JapanVipReferenceKind, string> = {
@@ -162,6 +163,8 @@ export default function JapanVipLearningPage() {
             : aiStatus?.ollamaCloud.error || "Chưa sẵn sàng"}
         </p>
       </Card>
+
+      <ImageFormatCard />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <Card title="Thư viện bài tham khảo">
