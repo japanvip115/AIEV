@@ -22,7 +22,7 @@ import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
 import { researchOfficialProduct } from "../officialProductResearch.js";
 import { applyLearnedImageSelection, getJapanVipImageLearningProfile, recordExplicitImageDecision, removeExplicitImageDecision } from "../japanVipImageLearning.js";
-import { approveJapanVipProjectAsLearning, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
+import { approveJapanVipProjectAsLearning, buildJapanVipPreviewHtml, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -272,6 +272,13 @@ router.get("/:id/publication-package/download", (req, res) => {
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${project.publicationPackage?.fileName ?? `${project.id}-japanvip.zip`}"`);
   res.send(archive);
+});
+
+router.get("/:id/publication-preview", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; font-src 'none'; connect-src 'none'; frame-ancestors 'self'");
+  res.send(buildJapanVipPreviewHtml(project));
 });
 
 router.get("/:id", (req, res) => res.json(readJapanVipContent(req.params.id)));

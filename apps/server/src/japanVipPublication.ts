@@ -139,6 +139,134 @@ function publicationBlockers(project: JapanVipContentProject): string[] {
   return blockers;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function safeHttpUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? escapeHtml(url.href) : "";
+  } catch {
+    return "";
+  }
+}
+
+function inlineMarkdown(value: string): string {
+  let html = escapeHtml(value);
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, label: string, url: string) => {
+    const safe = safeHttpUrl(url.replace(/&amp;/g, "&"));
+    return safe ? `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>` : label;
+  });
+  return html;
+}
+
+function markdownTable(lines: string[]): string {
+  const cells = (line: string) => line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => inlineMarkdown(cell.trim()));
+  const head = cells(lines[0]);
+  const rows = lines.slice(2).map(cells);
+  return `<div class="jv-table-wrap"><table><thead><tr>${head.map((cell) => `<th>${cell}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function markdownToHtml(markdown: string): string {
+  const lines = markdown.replace(/\r/g, "").split("\n");
+  const out: string[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (!line) { index += 1; continue; }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const level = heading[1].length === 1 ? 2 : Math.min(heading[1].length, 3);
+      out.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      index += 1;
+      continue;
+    }
+    if (/^>/.test(line)) {
+      const quote: string[] = [];
+      while (index < lines.length && /^\s*>/.test(lines[index])) quote.push(lines[index++].replace(/^\s*>\s?/, ""));
+      const items = quote.filter((item) => /^[-*]\s+/.test(item));
+      const title = quote.find((item) => item.trim() && !/^[-*]\s+/.test(item));
+      out.push(`<aside class="jv-callout">${title ? `<p>${inlineMarkdown(title)}</p>` : ""}${items.length ? `<ul>${items.map((item) => `<li>${inlineMarkdown(item.replace(/^[-*]\s+/, ""))}</li>`).join("")}</ul>` : ""}</aside>`);
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) items.push(lines[index++].replace(/^\s*[-*]\s+/, ""));
+      out.push(`<ul>${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\s*\d+\.\s+/.test(lines[index])) items.push(lines[index++].replace(/^\s*\d+\.\s+/, ""));
+      out.push(`<ol>${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</ol>`);
+      continue;
+    }
+    if (line.includes("|") && index + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1])) {
+      const tableLines = [lines[index], lines[index + 1]];
+      index += 2;
+      while (index < lines.length && lines[index].includes("|") && lines[index].trim()) tableLines.push(lines[index++]);
+      out.push(markdownTable(tableLines));
+      continue;
+    }
+    const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
+    if (image) {
+      const src = safeHttpUrl(image[2]);
+      if (src) out.push(`<figure><img src="${src}" alt="${escapeHtml(image[1])}" loading="lazy"><figcaption>${escapeHtml(image[1])}</figcaption></figure>`);
+      index += 1;
+      continue;
+    }
+    const paragraph = [line];
+    index += 1;
+    while (index < lines.length && lines[index].trim() && !/^(#{1,3})\s+|^\s*>|^\s*[-*]\s+|^\s*\d+\.\s+/.test(lines[index])) {
+      if (lines[index].includes("|") && index + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1])) break;
+      paragraph.push(lines[index].trim()); index += 1;
+    }
+    out.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+  }
+  return out.join("\n");
+}
+
+function imageFigure(image: JapanVipContentProject["images"][number], className = ""): string {
+  const src = safeHttpUrl(image.url);
+  if (!src) return "";
+  const alt = escapeHtml(image.altText || image.caption || image.role);
+  const caption = escapeHtml(image.caption || image.altText || "Ảnh chính thức từ hãng");
+  return `<figure${className ? ` class="${className}"` : ""}><img src="${src}" alt="${alt}" loading="lazy"><figcaption>${caption}</figcaption></figure>`;
+}
+
+export function buildJapanVipArticleHtml(project: JapanVipContentProject): string {
+  assertApprovedBase(project);
+  const approved = project.images.filter((image) => image.status === "approved");
+  const hero = approved.find((image) => image.role === "hero");
+  const packshot = approved.find((image) => image.role === "main-packshot");
+  const feature = approved.filter((image) => image.role === "feature");
+  const featureSmall = approved.filter((image) => image.role === "feature-small");
+  const installation = approved.filter((image) => image.role === "alternate-angle" || image.role === "dimensions");
+  let body = markdownToHtml(project.article.trim());
+  if (packshot) body = body.replace(/<\/p>/, `</p>${imageFigure(packshot, "jv-packshot")}`);
+  const featureGallery = [...feature.map((image) => imageFigure(image)), featureSmall.length ? `<div class="jv-feature-grid">${featureSmall.map((image) => imageFigure(image)).join("")}</div>` : ""].join("");
+  if (featureGallery) {
+    const featureHeading = /(<h2>[^<]*(?:đáng chú ý|tính năng)[^<]*<\/h2>)/i;
+    body = featureHeading.test(body) ? body.replace(featureHeading, `$1<section class="jv-media-block">${featureGallery}</section>`) : `<section class="jv-media-block">${featureGallery}</section>${body}`;
+  }
+  if (installation.length) {
+    const installHeading = /(<h2>[^<]*(?:kiểm tra|lắp đặt)[^<]*<\/h2>)/i;
+    const gallery = `<div class="jv-install-grid">${installation.map((image) => imageFigure(image)).join("")}</div>`;
+    body = installHeading.test(body) ? body.replace(installHeading, `${gallery}$1`) : `${body}${gallery}`;
+  }
+  return `<article class="jv-article">${hero ? imageFigure(hero, "jv-hero") : ""}${body}</article>`;
+}
+
+export function buildJapanVipPreviewHtml(project: JapanVipContentProject): string {
+  const article = buildJapanVipArticleHtml(project);
+  return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(project.name)} — Bản xem trước</title><style>
+  :root{color-scheme:light;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202124;background:#f4f5f7}*{box-sizing:border-box}body{margin:0}.jv-preview-head{padding:16px 22px;background:#111827;color:#fff;position:sticky;top:0;z-index:2}.jv-preview-head strong{display:block;font-size:15px}.jv-preview-head span{font-size:12px;color:#cbd5e1}.jv-shell{max-width:980px;margin:28px auto;padding:0 18px}.jv-title{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:0 0 24px}.jv-article{background:#fff;border-radius:18px;padding:clamp(20px,4vw,52px);box-shadow:0 12px 38px rgba(15,23,42,.08)}.jv-article h2{font-size:clamp(23px,3vw,32px);line-height:1.25;margin:42px 0 14px}.jv-article h3{font-size:21px;line-height:1.35;margin:30px 0 10px}.jv-article p,.jv-article li{font-size:17px;line-height:1.8}.jv-article ul,.jv-article ol{padding-left:24px}.jv-article a{color:#d9272e}.jv-article figure{margin:26px 0}.jv-article img{display:block;width:100%;height:auto;border-radius:14px;background:#f8fafc}.jv-article figcaption{text-align:center;color:#64748b;font-size:13px;margin-top:8px}.jv-hero{margin-top:0!important}.jv-callout{margin:28px 0;padding:20px 24px;border-left:5px solid #ef3e46;border-radius:12px;background:#fff1f2}.jv-callout p{margin-top:0;font-weight:700}.jv-table-wrap{overflow-x:auto;margin:24px 0}table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:13px 14px;border:1px solid #e2e8f0;text-align:left;vertical-align:top}th{background:#f8fafc}.jv-media-block{margin:22px 0}.jv-feature-grid,.jv-install-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.jv-feature-grid figure,.jv-install-grid figure{margin:0}.jv-feature-grid img{aspect-ratio:4/3;object-fit:contain}@media(max-width:680px){.jv-shell{padding:0;margin:0}.jv-article{border-radius:0;padding:22px}.jv-feature-grid,.jv-install-grid{grid-template-columns:1fr}.jv-preview-head{position:static}}
+  </style></head><body><div class="jv-preview-head"><strong>Bản xem trước HTML — chưa đăng lên website</strong><span>${escapeHtml(project.productModel)} · Hermes ${project.hermesReviews[0]?.totalScore ?? 0}/100 · ${project.images.filter((image) => image.status === "approved").length} ảnh đã duyệt</span></div><main class="jv-shell"><h1 class="jv-title">${escapeHtml(project.name)}</h1>${article}</main></body></html>`;
+}
+
 export function prepareJapanVipPublicationPackage(project: JapanVipContentProject) {
   const { review } = assertApprovedBase(project);
   const blockers = publicationBlockers(project);
@@ -170,7 +298,7 @@ export function buildJapanVipPublicationZip(project: JapanVipContentProject): Bu
     audience: project.audience,
     reviewScore: prepared.reviewScore,
     generatedAt: prepared.generatedAt,
-    files: ["article.md", "article-package.json", "images.json", "sources-internal.json", "facts-internal.txt"],
+    files: ["article.md", "article.html", "preview.html", "article-package.json", "images.json", "sources-internal.json", "facts-internal.txt"],
   };
   const imageManifest = approvedImages.map((image) => ({
     role: image.role,
@@ -191,8 +319,10 @@ export function buildJapanVipPublicationZip(project: JapanVipContentProject): Bu
     fetchedAt: source.fetchedAt,
   }));
   const zip = new AdmZip();
-  zip.addFile("README.txt", Buffer.from("Gói nháp đã được Japan VIP duyệt nội bộ. article.md là nội dung làm việc; images.json chứa URL ảnh hãng, caption, alt text và căn cứ quyền sử dụng. sources-internal.json và facts-internal.txt chỉ dùng đối chiếu nội bộ, không dán vào bài công khai. Gói này không tự đăng hoặc thay đổi trạng thái CMS.\n", "utf8"));
+  zip.addFile("README.txt", Buffer.from("Gói nháp đã được Japan VIP duyệt nội bộ. Mở preview.html để đọc và kiểm tra bố cục hoàn chỉnh. article.html là fragment HTML dùng cho CMS; article.md là nội dung làm việc. images.json chứa URL ảnh hãng, caption, alt text và căn cứ quyền sử dụng. sources-internal.json và facts-internal.txt chỉ dùng đối chiếu nội bộ, không dán vào bài công khai. Gói này không tự đăng hoặc thay đổi trạng thái CMS.\n", "utf8"));
   zip.addFile("article.md", Buffer.from(project.article.trim() + "\n", "utf8"));
+  zip.addFile("article.html", Buffer.from(buildJapanVipArticleHtml(project) + "\n", "utf8"));
+  zip.addFile("preview.html", Buffer.from(buildJapanVipPreviewHtml(project) + "\n", "utf8"));
   zip.addFile("article-package.json", Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8"));
   zip.addFile("images.json", Buffer.from(JSON.stringify(imageManifest, null, 2) + "\n", "utf8"));
   zip.addFile("sources-internal.json", Buffer.from(JSON.stringify(sourceManifest, null, 2) + "\n", "utf8"));

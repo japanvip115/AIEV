@@ -3011,6 +3011,9 @@ export const prepareJapanVipPublicationPackage = (id: string) =>
 export const japanVipPublicationPackageDownloadUrl = (id: string) =>
   `/api/japanvip-content/${encodeURIComponent(id)}/publication-package/download`;
 
+export const japanVipPublicationPreviewUrl = (id: string) =>
+  `/api/japanvip-content/${encodeURIComponent(id)}/publication-preview`;
+
 export interface JapanVipImageLearningProfile {
   mode: "manual" | "hybrid";
   reviewedProjects: number;

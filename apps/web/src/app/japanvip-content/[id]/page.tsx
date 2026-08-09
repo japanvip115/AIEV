@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Brain, CheckCircle2, ClipboardPaste, Database, Download, ExternalLink, FileCheck2, Images, Package, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
+import { ArrowLeft, Brain, CheckCircle2, ClipboardPaste, Database, Download, ExternalLink, Eye, FileCheck2, Images, Package, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -30,6 +30,7 @@ import {
   getJapanVipImageLearningProfile,
   getJapanVipLearningLibrary,
   japanVipPublicationPackageDownloadUrl,
+  japanVipPublicationPreviewUrl,
   prepareJapanVipPublicationPackage,
   updateJapanVipContentProject,
   updateJapanVipContentImage,
@@ -536,7 +537,7 @@ export default function JapanVipContentDetailPage() {
                 <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
                   <div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface))] text-[var(--primary)]"><Package size={17} /></span><div><p className="font-semibold">Chuẩn bị bản đăng Japan VIP</p><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Kiểm tra điểm, claim chưa xác minh, nguồn và ảnh; sau đó tạo ZIP gồm Markdown cùng manifest ảnh, nguồn và fact nội bộ.</p></div></div>
                   {(draft.article.match(/\[CẦN KIỂM CHỨNG\]/gi)?.length ?? 0) > 0 && <p className="mt-3 rounded-[var(--radius)] bg-amber-50 px-3 py-2 text-xs text-amber-800">Đang chặn tạo gói: còn {draft.article.match(/\[CẦN KIỂM CHỨNG\]/gi)?.length} nhãn [CẦN KIỂM CHỨNG] trong bài.</p>}
-                  <div className="mt-3 flex flex-wrap gap-2"><Button small variant="secondary" disabled={busy !== null} onClick={() => void run("publication-package", () => prepareJapanVipPublicationPackage(id))}><Package size={14} /> {busy === "publication-package" ? "Đang kiểm tra…" : draft.publicationPackage ? "Tạo lại gói đăng" : "Kiểm tra & tạo gói đăng"}</Button>{draft.publicationPackage && <a className="btn btn-secondary btn-sm" href={japanVipPublicationPackageDownloadUrl(id)} download={draft.publicationPackage.fileName}><Download size={14} /> Tải ZIP</a>}</div>
+                  <div className="mt-3 flex flex-wrap gap-2"><Button small variant="secondary" disabled={busy !== null} onClick={() => void run("publication-package", () => prepareJapanVipPublicationPackage(id))}><Package size={14} /> {busy === "publication-package" ? "Đang kiểm tra…" : draft.publicationPackage ? "Tạo lại gói đăng" : "Kiểm tra & tạo gói đăng"}</Button>{draft.publicationPackage && <><a className="btn btn-secondary btn-sm" href={japanVipPublicationPreviewUrl(id)} target="_blank" rel="noreferrer"><Eye size={14} /> Xem trước HTML</a><a className="btn btn-secondary btn-sm" href={japanVipPublicationPackageDownloadUrl(id)} download={draft.publicationPackage.fileName}><Download size={14} /> Tải ZIP</a></>}</div>
                   {draft.publicationPackage && <p className="mt-2 text-[11px] text-emerald-700">Đã tạo gói {draft.publicationPackage.reviewScore}/100 · {draft.publicationPackage.approvedImageCount} ảnh · {new Date(draft.publicationPackage.generatedAt).toLocaleString("vi-VN")}</p>}
                 </div>
               </div>
