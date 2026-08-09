@@ -49,9 +49,13 @@ export default function JapanVipLearningPage() {
   const [url, setUrl] = useState("");
   const [ownedUrl, setOwnedUrl] = useState("");
   const [ownedTags, setOwnedTags] = useState("");
+  const [ownedManualTitle, setOwnedManualTitle] = useState("");
+  const [ownedManualText, setOwnedManualText] = useState("");
   const [kind, setKind] = useState<JapanVipReferenceKind>("competitor");
   const [aiProvider, setAiProvider] = useState<JapanVipAiProvider>("codex");
   const [tags, setTags] = useState("");
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualText, setManualText] = useState("");
   const [rule, setRule] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,12 +106,21 @@ export default function JapanVipLearningPage() {
           <input className="input" value={ownedUrl} onChange={(e) => setOwnedUrl(e.target.value)} placeholder="https://japanvip.vn/bai-viet/..." />
           <input className="input" value={ownedTags} onChange={(e) => setOwnedTags(e.target.value)} placeholder="Nồi cơm, bài tư vấn…" />
           <Button disabled={!ownedUrl.trim() || busy !== null} onClick={() => void run("add-owned", async () => {
-            const next = await addJapanVipOwnedArticle({ url: ownedUrl.trim(), tags: ownedTags.split(",").map((tag) => tag.trim()).filter(Boolean) });
+            const next = await addJapanVipOwnedArticle({ url: ownedUrl.trim(), tags: ownedTags.split(",").map((tag) => tag.trim()).filter(Boolean), title: ownedManualTitle.trim() || undefined, text: ownedManualText.trim() || undefined });
             setOwnedUrl("");
             setOwnedTags("");
+            setOwnedManualTitle("");
+            setOwnedManualText("");
             return next;
           })}><ShieldCheck size={15} /> {busy === "add-owned" ? "Ollama Cloud đang chấm…" : "Nhập và chấm bằng Ollama Cloud"}</Button>
         </div>
+        <details className="mt-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--primary)]">Trang chặn bot hoặc dùng JavaScript? Dán nội dung bài tại đây</summary>
+          <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Giữ URL bài ở ô phía trên, rồi sao chép phần nội dung bài viết và dán bên dưới. Bản gốc trên website không bị thay đổi.</p>
+          <input className="input mt-3" value={ownedManualTitle} onChange={(e) => setOwnedManualTitle(e.target.value)} placeholder="Tên bài viết" />
+          <textarea className="input mt-2 min-h-44 resize-y" value={ownedManualText} onChange={(e) => setOwnedManualText(e.target.value)} placeholder="Dán nội dung bài viết (tối thiểu 200 ký tự)…" />
+          <p className={`mt-2 text-xs ${ownedManualText.trim().length >= 200 ? "text-emerald-700" : "text-[var(--text-muted)]"}`}>{ownedManualText.trim().length}/200 ký tự tối thiểu</p>
+        </details>
         <p className="mt-3 text-xs text-[var(--text-muted)]">Bài đạt điểm vẫn cần bạn bấm duyệt. Nội dung được dùng để học cách viết, không tự trở thành nguồn xác thực thông số sản phẩm.</p>
       </Card>
 
@@ -128,12 +141,21 @@ export default function JapanVipLearningPage() {
           </select>
           <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Nồi cơm, mở bài, SEO…" />
           <Button disabled={!url.trim() || busy !== null} onClick={() => void run("add-article", async () => {
-            const next = await addJapanVipReferenceArticle({ url: url.trim(), kind, aiProvider, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) });
+            const next = await addJapanVipReferenceArticle({ url: url.trim(), kind, aiProvider, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean), title: manualTitle.trim() || undefined, text: manualText.trim() || undefined });
             setUrl("");
             setTags("");
+            setManualTitle("");
+            setManualText("");
             return next;
           })}><Plus size={15} /> {busy === "add-article" ? `${AI_LABEL[aiProvider]} đang phân tích…` : "Thêm và phân tích"}</Button>
         </div>
+        <details className="mt-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--primary)]">Không bóc được URL? Dán nội dung bài cần học</summary>
+          <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Hệ thống vẫn giữ URL để đối chiếu, nhưng AI chỉ phân tích phần chữ bạn dán; không dùng bài này làm nguồn xác thực thông số.</p>
+          <input className="input mt-3" value={manualTitle} onChange={(e) => setManualTitle(e.target.value)} placeholder="Tên bài viết" />
+          <textarea className="input mt-2 min-h-44 resize-y" value={manualText} onChange={(e) => setManualText(e.target.value)} placeholder="Dán nội dung bài viết (tối thiểu 200 ký tự)…" />
+          <p className={`mt-2 text-xs ${manualText.trim().length >= 200 ? "text-emerald-700" : "text-[var(--text-muted)]"}`}>{manualText.trim().length}/200 ký tự tối thiểu</p>
+        </details>
         <p className="mt-3 text-xs text-[var(--text-muted)]">
           Ollama: {aiStatus?.ollama.running
             ? aiStatus.ollama.installed ? `Sẵn sàng · ${aiStatus.ollama.model}` : `Đang chạy nhưng thiếu ${aiStatus.ollama.model}`

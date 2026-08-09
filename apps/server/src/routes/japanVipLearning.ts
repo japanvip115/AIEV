@@ -21,6 +21,20 @@ const router = Router();
 const KINDS = new Set<JapanVipReferenceKind>(["competitor", "inspiration", "japanvip"]);
 const JAPANVIP_APPROVAL_SCORE = 85;
 const JAPANVIP_ACCURACY_SCORE = 80;
+const MIN_MANUAL_ARTICLE_CHARS = 200;
+
+function manualArticleInput(body: Record<string, unknown>) {
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (!text) return null;
+  if (text.length < MIN_MANUAL_ARTICLE_CHARS) {
+    throw new HttpError(400, "MANUAL_ARTICLE_TOO_SHORT", `Nội dung dán thủ công cần ít nhất ${MIN_MANUAL_ARTICLE_CHARS} ký tự`);
+  }
+  if (/^https?:\/\/\S+$/i.test(text)) {
+    throw new HttpError(400, "MANUAL_ARTICLE_URL_ONLY", "Ô nội dung cần phần chữ của bài viết, không phải URL");
+  }
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  return { text: text.slice(0, 60_000), title };
+}
 
 function publicLibrary() {
   const library = readJapanVipLearningLibrary();
@@ -63,7 +77,7 @@ async function analyzeJapanVipArticle(text: string, title: string) {
   return { review, analysis: normalizeStyleAnalysis(parsed.analysis) };
 }
 
-async function importJapanVipArticle(url: string, tags: string[]) {
+async function importJapanVipArticle(url: string, tags: string[], manual: ReturnType<typeof manualArticleInput>) {
   let hostname = "";
   try { hostname = new URL(url).hostname.toLocaleLowerCase("en"); } catch { /* handled below */ }
   if (hostname !== "japanvip.vn" && hostname !== "www.japanvip.vn") {
@@ -71,18 +85,19 @@ async function importJapanVipArticle(url: string, tags: string[]) {
   }
   const library = readJapanVipLearningLibrary();
   if (library.articles.length >= 100) throw new HttpError(400, "REFERENCE_LIMIT", "Thư viện nhận tối đa 100 bài tham khảo");
-  const extracted = await extractArticleFromUrl(url);
-  const canonical = extracted.canonicalUrl ?? url;
+  const extracted = manual ? null : await extractArticleFromUrl(url);
+  const canonical = extracted?.canonicalUrl ?? url;
   if (library.articles.some((article) => (article.canonicalUrl ?? article.url) === canonical)) {
     throw new HttpError(409, "REFERENCE_EXISTS", "Bài viết này đã có trong thư viện");
   }
-  const text = extracted.blocks.join("\n\n").slice(0, 60_000);
-  const { review, analysis } = await analyzeJapanVipArticle(text, extracted.title);
+  const text = manual?.text ?? extracted!.blocks.join("\n\n").slice(0, 60_000);
+  const title = manual?.title || extracted?.title || new URL(url).pathname.split("/").filter(Boolean).pop() || "Bài Japan VIP";
+  const { review, analysis } = await analyzeJapanVipArticle(text, title);
   if (!analysis.summary) analysis.summary = review.summary;
   const now = nowIso();
   const article: JapanVipReferenceArticle = {
-    id: nanoid(10), kind: "japanvip", url, canonicalUrl: extracted.canonicalUrl,
-    title: extracted.title, siteName: extracted.siteName, tags, text, analysis,
+    id: nanoid(10), kind: "japanvip", url, canonicalUrl: extracted?.canonicalUrl ?? null,
+    title, siteName: extracted?.siteName || hostname, tags, text, analysis,
     hermesReview: review, approvalStatus: "pending", approvedAt: null, active: false,
     fetchedAt: now, createdAt: now, updatedAt: now,
   };
@@ -121,7 +136,7 @@ router.post("/japanvip-articles", async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const url = typeof body.url === "string" ? body.url.trim() : "";
   if (!url) throw new HttpError(400, "INVALID_URL", "Thiếu URL bài Japan VIP cần chấm");
-  await importJapanVipArticle(url, cleanTags(body.tags));
+  await importJapanVipArticle(url, cleanTags(body.tags), manualArticleInput(body));
   res.status(201).json(publicLibrary());
 });
 
@@ -135,18 +150,20 @@ router.post("/articles", async (req, res) => {
   if (kind === "japanvip") throw new HttpError(400, "USE_JAPANVIP_REVIEW_FLOW", "Bài Japan VIP phải được nhập qua luồng Hermes chấm và duyệt");
   const library = readJapanVipLearningLibrary();
   if (library.articles.length >= 100) throw new HttpError(400, "REFERENCE_LIMIT", "Thư viện nhận tối đa 100 bài tham khảo");
-  const extracted = await extractArticleFromUrl(url);
-  const canonical = extracted.canonicalUrl ?? url;
+  const manual = manualArticleInput(body);
+  const extracted = manual ? null : await extractArticleFromUrl(url);
+  const canonical = extracted?.canonicalUrl ?? url;
   if (library.articles.some((article) => (article.canonicalUrl ?? article.url) === canonical)) {
     throw new HttpError(409, "REFERENCE_EXISTS", "Bài viết này đã có trong thư viện");
   }
-  const text = extracted.blocks.join("\n\n").slice(0, 60_000);
+  const text = manual?.text ?? extracted!.blocks.join("\n\n").slice(0, 60_000);
+  const title = manual?.title || extracted?.title || new URL(url).pathname.split("/").filter(Boolean).pop() || "Bài tham khảo";
   const prompt = [
     "Bạn là chiến lược gia nội dung cấp cao của Japan VIP.",
     "Phân tích KỸ THUẬT VIẾT của bài dưới đây, không xác nhận thông tin sản phẩm và không sao chép câu chữ.",
     "Tập trung vào cấu trúc, mở bài, cách biến tính năng thành lợi ích, SEO, sức thuyết phục, điểm mạnh và khoảng trống có thể làm tốt hơn.",
     "Trả JSON thuần với các khóa: summary (string), structure, openingPatterns, persuasionPatterns, seoPatterns, strengths, weaknesses, reusableLessons, avoidCopying (đều là mảng string).",
-    `TIÊU ĐỀ: ${extracted.title}`,
+    `TIÊU ĐỀ: ${title}`,
     `LOẠI TÀI LIỆU: ${kind}`,
     `NỘI DUNG:\n${text.slice(0, 24_000)}`,
   ].join("\n\n");
@@ -158,9 +175,9 @@ router.post("/articles", async (req, res) => {
     id: nanoid(10),
     kind,
     url,
-    canonicalUrl: extracted.canonicalUrl,
-    title: extracted.title,
-    siteName: extracted.siteName,
+    canonicalUrl: extracted?.canonicalUrl ?? null,
+    title,
+    siteName: extracted?.siteName || new URL(url).hostname,
     tags: cleanTags(body.tags),
     text,
     analysis: normalizeStyleAnalysis(parsed),

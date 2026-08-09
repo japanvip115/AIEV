@@ -3201,9 +3201,11 @@ export const addJapanVipReferenceArticle = (input: {
   kind: JapanVipReferenceKind;
   tags?: string[];
   aiProvider?: JapanVipAiProvider;
+  title?: string;
+  text?: string;
 }) => post<JapanVipLearningLibrary>("/api/japanvip-learning/articles", input);
 
-export const addJapanVipOwnedArticle = (input: { url: string; tags?: string[] }) =>
+export const addJapanVipOwnedArticle = (input: { url: string; tags?: string[]; title?: string; text?: string }) =>
   post<JapanVipLearningLibrary>("/api/japanvip-learning/japanvip-articles", input);
 
 export const reviewJapanVipOwnedArticle = (id: string) =>

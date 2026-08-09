@@ -3,6 +3,7 @@ import { parseHTML } from "linkedom";
 import { safeFetchHtml, SafeFetchError } from "./safeFetch.js";
 import type { ExtractedArticle } from "./textToVideoMeta.js";
 import { HttpError } from "./util.js";
+import { extractArticleWithCrawl4Ai } from "./crawl4aiExtract.js";
 
 /**
  * Bóc nội dung bài viết từ một trang web (Text to video, nguồn kind="url").
@@ -388,5 +389,14 @@ export async function extractArticleFromUrl(url: string): Promise<ExtractedArtic
   }
   // Tín hiệu thứ nhất trong hai tín hiệu phát hiện bóc hỏng (xem extractArticleFromHtml)
   if (fetched.status !== 200) throw extractFailed();
-  return extractArticleFromHtml(fetched.html, fetched.finalUrl);
+  try {
+    return extractArticleFromHtml(fetched.html, fetched.finalUrl);
+  } catch (err) {
+    if (!(err instanceof HttpError) || err.code !== "EXTRACT_FAILED") throw err;
+    // Trang public tải được nhưng nội dung được dựng bằng JavaScript: dùng
+    // Chromium của Crawl4AI làm lớp fallback, không gọi với URL đã bị safeFetch chặn.
+    const crawled = await extractArticleWithCrawl4Ai(fetched.finalUrl);
+    if (crawled) return crawled;
+    throw err;
+  }
 }
