@@ -183,6 +183,21 @@ function imageKey(url: string): string {
   return url.trim().replace(/[?#].*$/, "").replace(/\/$/, "").toLowerCase();
 }
 
+/**
+ * Gỡ dấu trích nguồn kiểu [Nguồn 1] khỏi bài.
+ *
+ * Không chỗ nào bảo AI viết thứ này; nó bắt chước cách các nguồn được đánh số
+ * trong prompt ("## NGUỒN 1: ..."). Đây là ghi chú nội bộ lọt ra bản đăng - độc
+ * giả japanvip.vn không có danh sách nguồn đánh số nào để tra.
+ */
+export function stripSourceMarkers(markdown: string): string {
+  return markdown
+    .replace(/\s*[[(]\s*(?:nguồn|nguon|source|src)\s*\d+(?:\s*[,;và&]+\s*\d+)*\s*[\])]/gi, "")
+    // Dấu nằm cuối câu thì bỏ nó đi hay để lại một khoảng trắng trước dấu chấm.
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ");
+}
+
 function markdownToHtml(
   markdown: string,
   byUrl: Map<string, ArticleImage> = new Map(),
@@ -395,7 +410,7 @@ export function buildJapanVipArticleHtml(project: JapanVipContentProject): strin
   // Ảnh AI đã tự chèn trong Markdown thì hệ thống KHÔNG bố trí lại lần nữa,
   // nếu không cùng một hình xuất hiện hai lần trong bài.
   const used = new Set<string>();
-  let body = markdownToHtml(project.article.trim(), byUrl, used);
+  let body = markdownToHtml(stripSourceMarkers(project.article.trim()), byUrl, used);
 
   const remaining = (role: ArticleImage["role"]) => approved.filter((image) => image.role === role && !used.has(image.id));
   const hero = remaining("hero")[0];

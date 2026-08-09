@@ -23,7 +23,7 @@ import { discoverJapanVipImages } from "../japanVipImages.js";
 import { resolveImageFormat } from "../japanVipImageFormat.js";
 import { researchOfficialProduct } from "../officialProductResearch.js";
 import { applyLearnedImageSelection, getJapanVipImageLearningProfile, recordExplicitImageDecision, removeExplicitImageDecision } from "../japanVipImageLearning.js";
-import { approveJapanVipProjectAsLearning, buildJapanVipPreviewHtml, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
+import { stripSourceMarkers, approveJapanVipProjectAsLearning, buildJapanVipPreviewHtml, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -558,6 +558,9 @@ router.post("/:id/generate-article", async (req, res) => {
     "Không được sao chép nguyên câu hoặc mô phỏng quá sát bài tham khảo. Phải viết mới bằng giọng tự nhiên của Japan VIP.",
     UNKNOWN_FACT_POLICY,
     "Không tự tạo đánh giá khách hàng.",
+    "TUYỆT ĐỐI KHÔNG viết dấu trích nguồn trong bài: không [Nguồn 1], không (Nguồn 2), không đánh số nguồn dưới bất kỳ dạng nào. Bài đăng cho người mua hàng đọc, không phải báo cáo nội bộ.",
+    "Mỗi câu phải là một câu hoàn chỉnh có chủ ngữ và vị ngữ. Không viết câu cụt kiểu \"Panasonic NP-TZ500.\" hay \"Máy rửa bát Panasonic NP-TZ500 - 40 món.\"; phải là \"Panasonic NP-TZ500 rửa được 40 món mỗi mẻ.\"",
+    "Không mở đầu đoạn hay mở đầu câu bằng mỗi tên model đứng trơ trọi. Tên model phải nằm trong một câu có động từ.",
     "Xuất Markdown thuần, không bọc code fence, không giải thích thêm.",
     `DÀN Ý:\n${project.outline}`,
     japanVipLearningContext(project.selectedReferenceIds),
@@ -581,7 +584,7 @@ router.post("/:id/generate-article", async (req, res) => {
     );
   }
   invalidateArticleApproval(project);
-  project.article = omitUnverifiedLines(article);
+  project.article = stripSourceMarkers(omitUnverifiedLines(article));
   project.selectiveRevision = null;
   project.status = "review";
   writeJapanVipContent(project);
