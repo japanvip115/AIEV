@@ -130,19 +130,20 @@ const ROLE_PRIORITY: Partial<Record<JapanVipImageRole, number>> = { hero: 3, "ma
  * URL thì không bao giờ trùng - đã thấy np-tz500-main-pc và -main-sp cùng lên
  * một bài.
  */
+/** Khóa nhận dạng một tấm hình, bỏ qua biến thể PC/mobile/@2x. */
+export function variantKey(url: string): string {
+  const fileName = url.replace(/[?#].*$/, "").split("/").filter(Boolean).pop() ?? url;
+  const base = fileName
+    .replace(/\.(jpg|jpeg|png|webp|avif|gif)$/i, "")
+    .replace(/@\dx$/i, "")
+    .replace(/([_-])(pc|sp|mobile|mo|tablet|retina)$/i, "")
+    .replace(/[_-]\d{3,4}(x\d{3,4})?$/i, "")
+    .toLocaleLowerCase("en");
+  return base.length >= 6 ? `name:${base}` : `url:${url}`;
+}
+
 export function dedupeVariants<T extends Pick<JapanVipContentImage, "url" | "altText" | "width" | "height"> & { role?: JapanVipImageRole }>(images: T[]): T[] {
-  const key = (image: T): string => {
-    const fileName = image.url.replace(/[?#].*$/, "").split("/").filter(Boolean).pop() ?? image.url;
-    const base = fileName
-      .replace(/\.(jpg|jpeg|png|webp|avif|gif)$/i, "")
-      .replace(/@\dx$/i, "")
-      .replace(/([_-])(pc|sp|mobile|mo|tablet|retina)$/i, "")
-      .replace(/[_-]\d{3,4}(x\d{3,4})?$/i, "")
-      .toLocaleLowerCase("en");
-    // Tên quá chung ("main", "img01") thì gom nhầm hai hình khác nhau còn tệ hơn
-    // là để lọt một bản trùng - trường hợp đó bỏ qua, không gom.
-    return base.length >= 6 ? `name:${base}` : `url:${image.url}`;
-  };
+  const key = (image: T): string => variantKey(image.url);
 
   // VAI TRÒ THẮNG DIỆN TÍCH: xếp thuần theo diện tích thì bản mobile to hơn hất
   // bản PC đã được gán làm hero, bài mất ảnh hero trong im lặng còn cổng kiểm

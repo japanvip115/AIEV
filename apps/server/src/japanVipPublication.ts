@@ -13,6 +13,7 @@ import {
   captionOf,
   dedupeVariants,
   hasContextCaption,
+  variantKey,
   resolveImageFormat,
   type JapanVipImageLayout,
   type ResolvedFormat,
@@ -237,6 +238,7 @@ function markdownToHtml(
   byUrl: Map<string, ArticleImage> = new Map(),
   used?: Set<string>
 ): string {
+  const byVariant = new Map([...byUrl.values()].map((image) => [variantKey(image.url), image]));
   const lines = markdown.replace(/\r/g, "").split("\n");
   const out: string[] = [];
   let index = 0;
@@ -282,12 +284,41 @@ function markdownToHtml(
     }
     const image = line.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
     if (image) {
+      // Gom những dòng ảnh ĐỨNG LIỀN NHAU (cho phép cách nhau dòng trống) thành
+      // một nhóm, để luật "4 ảnh một hàng" áp được cả với ảnh do AI chèn - không
+      // gom thì mỗi tấm là một khối riêng và bố cục lưới không bao giờ xảy ra.
+      const group: ArticleImage[] = [];
+      let scan = index;
+      while (scan < lines.length) {
+        const candidate = lines[scan].trim();
+        if (!candidate) { scan += 1; continue; }
+        const next = candidate.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
+        if (!next) break;
+        const known = byUrl.get(imageKey(next[2])) ?? byVariant.get(variantKey(next[2]));
+        if (!known || used?.has(known.id) || group.some((item) => item.id === known.id)) break;
+        group.push(known);
+        scan += 1;
+      }
+      if (group.length > 1) {
+        for (const item of group) used?.add(item.id);
+        out.push(renderGroup(group));
+        index = scan;
+        continue;
+      }
       const src = safeHttpUrl(image[2]);
       if (src) {
         // Ảnh AI chèn trong bài trước đây ra <figure> TRẦN - mất sạch vai trò,
         // nên khổ ảnh chỉ áp được cho ảnh hệ thống tự bố trí. Tra ngược URL về
         // ảnh trong kho là chỗ duy nhất đưa detail/maintenance vào đúng khổ.
-        const known = byUrl.get(imageKey(image[2]));
+        // Bài viết trước đây có thể trỏ vào bản PC/mobile đã bị lọc trùng; tra
+        // tiếp theo khóa biến thể để nó về đúng tấm còn lại thay vì thành ảnh lạ.
+        const known = byUrl.get(imageKey(image[2])) ?? byVariant.get(variantKey(image[2]));
+        // Hai URL khác nhau (bản PC và bản mobile) quy về CÙNG một tấm sau khi
+        // lọc trùng. Chèn cả hai thì đúng một tấm ảnh hiện hai lần trong bài.
+        if (known && used?.has(known.id)) {
+          index += 1;
+          continue;
+        }
         if (known) {
           used?.add(known.id);
           out.push(`<div style="margin:26px 0">${renderFigure(known)}</div>`);
@@ -461,7 +492,9 @@ export function buildJapanVipArticleHtml(project: JapanVipContentProject): strin
   if (featureGallery) {
     for (const image of feature) used.add(image.id);
     const featureHeading = /(<h2>[^<]*(?:đáng chú ý|tính năng)[^<]*<\/h2>)/i;
-    body = featureHeading.test(body) ? body.replace(featureHeading, `$1${featureGallery}`) : `${featureGallery}${body}`;
+    // Không khớp heading thì ĐẶT XUỐNG CUỐI, không phải lên đầu: prepend đẩy cả
+    // cụm ảnh lên trên ảnh hero và trên câu mở bài.
+    body = featureHeading.test(body) ? body.replace(featureHeading, `$1${featureGallery}`) : `${body}${featureGallery}`;
   }
 
   const installGallery = renderGroup(installation);

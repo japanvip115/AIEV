@@ -20,7 +20,7 @@ import { HttpError, nowIso } from "../util.js";
 import { addJapanVipLearningRule, findCopiedReferenceExcerpt, japanVipLearningContext, readJapanVipLearningLibrary, writeJapanVipLearningLibrary } from "../japanVipLearning.js";
 import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
-import { resolveImageFormat } from "../japanVipImageFormat.js";
+import { dedupeVariants, resolveImageFormat } from "../japanVipImageFormat.js";
 import { researchOfficialProduct } from "../officialProductResearch.js";
 import { applyLearnedImageSelection, getJapanVipImageLearningProfile, recordExplicitImageDecision, removeExplicitImageDecision } from "../japanVipImageLearning.js";
 import { stripSourceMarkers, approveJapanVipProjectAsLearning, buildJapanVipPreviewHtml, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
@@ -77,7 +77,11 @@ function omitUnverifiedLines(markdown: string): string {
 }
 
 function imageWritingContext(project: JapanVipContentProject): string {
-  const approved = project.images.filter((image) => image.status === "approved");
+  // CÙNG danh sách mà renderer sẽ dùng. Trước đây manifest liệt kê cả 10 ảnh đã
+  // duyệt trong khi renderer lọc trùng PC/mobile còn 7, nên AI chèn những URL đã
+  // bị vứt đi: chúng rơi vào nhánh "ảnh lạ" và không được áp khổ nào, còn bản
+  // sống sót thì không ai dùng nên bị hệ thống nhét vào chỗ khác.
+  const approved = dedupeVariants(project.images.filter((image) => image.status === "approved"));
   if (!approved.length) return "Không có ảnh đã duyệt. Không tự chèn URL ảnh khác.";
   return [
     "MANIFEST ẢNH ĐÃ DUYỆT (chỉ được dùng các URL này, mỗi URL nhiều nhất một lần):",
