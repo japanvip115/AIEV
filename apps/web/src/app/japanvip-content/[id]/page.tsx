@@ -505,7 +505,7 @@ export default function JapanVipContentDetailPage() {
                         </label>
                         <div className="mt-3 grid gap-3 lg:grid-cols-2">
                           <div className="min-w-0 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-950"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-red-700">Đoạn hiện tại</p><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans leading-6">{change.before}</pre></div>
-                          <div className="min-w-0 rounded-[var(--radius)] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-700">Đoạn đề xuất</p><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans leading-6">{change.after}</pre></div>
+                          <div className="min-w-0 rounded-[var(--radius)] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-700">{change.after ? "Đoạn đề xuất" : "Bỏ khỏi bài"}</p><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans leading-6">{change.after || "Chi tiết này không có dữ liệu xác minh nên sẽ được xóa, không thay bằng nội dung suy đoán."}</pre></div>
                         </div>
                       </div>;
                     })}

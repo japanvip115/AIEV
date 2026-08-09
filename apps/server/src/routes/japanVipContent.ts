@@ -36,6 +36,7 @@ const IMAGE_ROLES = new Set<JapanVipImageRole>(["hero", "main-packshot", "altern
 const IMAGE_STATUSES = new Set<JapanVipImageStatus>(["pending", "approved", "rejected"]);
 const REVISION_CATEGORIES = new Set<JapanVipRevisionCategory>(["cta", "naturalness", "claims", "repetition", "seo"]);
 const MIN_MANUAL_SOURCE_CHARS = 20;
+const UNKNOWN_FACT_POLICY = "Chi tiết không có trong nguồn chính thức hoặc fact sheet thì bỏ qua hoàn toàn: không đưa vào dàn ý, không nhắc trong bài và không tạo nhãn [CẦN KIỂM CHỨNG]. Chỉ viết những dữ kiện đã xác minh.";
 const REVISION_CATEGORY_LABELS: Record<JapanVipRevisionCategory, string> = {
   cta: "CTA và tư vấn mua hàng",
   naturalness: "câu mang văn phong dịch hoặc thiếu tự nhiên",
@@ -63,6 +64,15 @@ function exactOccurrenceCount(haystack: string, needle: string): number {
     offset += needle.length;
   }
   return count;
+}
+
+function omitUnverifiedLines(markdown: string): string {
+  return markdown
+    .split("\n")
+    .filter((line) => !/\[CẦN KIỂM CHỨNG\]/i.test(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function imageWritingContext(project: JapanVipContentProject): string {
@@ -204,7 +214,8 @@ router.post("/auto", async (req, res) => {
       "Bạn là Codex, biên tập viên chịu trách nhiệm cuối cùng cho japanvip.vn.",
       "Từ duy nhất gói nguồn chính hãng bên dưới, hãy nhận diện chính xác loại sản phẩm, thương hiệu, model/suffix; sau đó tạo dàn ý và bài Markdown tiếng Việt hoàn chỉnh trong MỘT lượt để tiết kiệm hạn mức.",
       "Bài Japan VIP đã duyệt chỉ dùng để học giọng tư vấn, cấu trúc và cách giải thích. Không sao chép câu chữ và không lấy chúng làm nguồn thông số.",
-      "Không bịa giá, tồn kho, bảo hành, chứng nhận, trải nghiệm sử dụng hay công dụng. Claim chưa đủ điều kiện phải ghi [CẦN KIỂM CHỨNG].",
+      "Không bịa giá, tồn kho, bảo hành, chứng nhận, trải nghiệm sử dụng hay công dụng.",
+      UNKNOWN_FACT_POLICY,
       "Nếu không xác định chắc chắn model từ nguồn hãng, để productModel rỗng; hệ thống sẽ dừng để người dùng kiểm tra.",
       "Trả JSON thuần: {\"name\":\"loại sản phẩm + thương hiệu + model\",\"productModel\":\"\",\"targetKeyword\":\"\",\"outline\":\"Markdown H2/H3\",\"article\":\"bài Markdown hoàn chỉnh\"}.",
       japanVipLearningContext(project.selectedReferenceIds),
@@ -215,8 +226,8 @@ router.post("/auto", async (req, res) => {
     const name = typeof parsed?.name === "string" ? parsed.name.trim() : "";
     const productModel = typeof parsed?.productModel === "string" ? parsed.productModel.trim() : "";
     const targetKeyword = typeof parsed?.targetKeyword === "string" ? parsed.targetKeyword.trim() : "";
-    const outline = typeof parsed?.outline === "string" ? parsed.outline.trim() : "";
-    const article = typeof parsed?.article === "string" ? parsed.article.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/```$/, "").trim() : "";
+    const outline = typeof parsed?.outline === "string" ? omitUnverifiedLines(parsed.outline) : "";
+    const article = typeof parsed?.article === "string" ? omitUnverifiedLines(parsed.article.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/```$/, "").trim()) : "";
     if (!name || !productModel) throw new HttpError(422, "AUTO_IDENTITY_UNCERTAIN", `Đã tạo project “${project.name}” nhưng chưa khóa được model chính xác; hãy kiểm tra nguồn trước khi viết`);
     if (outline.length < 80 || article.length < 500) throw new HttpError(502, "AUTO_CONTENT_INCOMPLETE", `Đã tạo project “${project.name}” nhưng AI chưa trả đủ dàn ý và bài viết`);
     const copiedExcerpt = findCopiedReferenceExcerpt(article, project.selectedReferenceIds);
@@ -500,7 +511,8 @@ router.post("/:id/generate-outline", async (req, res) => {
   const prompt = [
     "Bạn là biên tập viên nội dung sản phẩm cao cấp cho japanvip.vn.",
     "Hãy lập dàn ý SEO tiếng Việt tự nhiên, giàu thông tin, không sáo rỗng.",
-    "Chỉ dùng dữ kiện có trong nguồn hoặc fact sheet; điểm chưa chắc chắn phải ghi [CẦN KIỂM CHỨNG].",
+    "Chỉ dùng dữ kiện có trong nguồn hoặc fact sheet.",
+    UNKNOWN_FACT_POLICY,
     "Không bịa giá, xuất xứ, bảo hành, chứng nhận hay công dụng.",
     "Nguồn chính thức và fact sheet là nguồn DUY NHẤT cho dữ kiện sản phẩm. Bài tham khảo chỉ dùng để học cách tổ chức và diễn đạt.",
     "Trả JSON thuần: {\"outline\": \"dàn ý Markdown với H2/H3\"}.",
@@ -513,7 +525,7 @@ router.post("/:id/generate-outline", async (req, res) => {
   if (!parsed || typeof parsed.outline !== "string" || !parsed.outline.trim()) {
     throw new HttpError(502, "OUTLINE_PARSE_FAILED", "AI không trả về dàn ý hợp lệ");
   }
-  project.outline = parsed.outline.trim();
+  project.outline = omitUnverifiedLines(parsed.outline);
   project.status = "writing";
   writeJapanVipContent(project);
   res.json(project);
@@ -528,7 +540,8 @@ router.post("/:id/generate-article", async (req, res) => {
     "Chỉ dùng dữ kiện có trong nguồn hoặc fact sheet. Không biến suy luận thành sự thật.",
     "Nguồn chính thức và fact sheet là nguồn DUY NHẤT cho dữ kiện sản phẩm. Bài tham khảo chỉ dùng để học bố cục, nhịp điệu và cách giải thích.",
     "Không được sao chép nguyên câu hoặc mô phỏng quá sát bài tham khảo. Phải viết mới bằng giọng tự nhiên của Japan VIP.",
-    "Mọi chỗ chưa đủ bằng chứng phải giữ nhãn [CẦN KIỂM CHỨNG]. Không tự tạo đánh giá khách hàng.",
+    UNKNOWN_FACT_POLICY,
+    "Không tự tạo đánh giá khách hàng.",
     "Xuất Markdown thuần, không bọc code fence, không giải thích thêm.",
     `DÀN Ý:\n${project.outline}`,
     japanVipLearningContext(project.selectedReferenceIds),
@@ -552,7 +565,7 @@ router.post("/:id/generate-article", async (req, res) => {
     );
   }
   invalidateArticleApproval(project);
-  project.article = article;
+  project.article = omitUnverifiedLines(article);
   project.selectiveRevision = null;
   project.status = "review";
   writeJapanVipContent(project);
@@ -583,6 +596,7 @@ router.post("/:id/selective-revision/preview", async (req, res) => {
     "Không viết lại toàn bài. Chỉ trả tối đa 8 thay đổi thật sự cần thiết thuộc đúng hạng mục đã chọn.",
     "Mỗi before phải được chép NGUYÊN VĂN từ bài hiện tại, đủ dài để chỉ xuất hiện đúng một lần. after chỉ là đoạn thay thế tương ứng.",
     "Giữ nguyên mọi dữ kiện đúng; không bổ sung claim, giá, bảo hành, chứng nhận hoặc trải nghiệm chưa có trong nguồn chính thức/fact sheet.",
+    "Nếu bài hiện tại có chi tiết không được nguồn/fact sheet hỗ trợ, hãy đề xuất xóa đúng câu hoặc đoạn đó thay vì giải thích rằng dữ liệu đang thiếu. Với đoạn chứa [CẦN KIỂM CHỨNG], after có thể để rỗng để xóa.",
     "Không xóa ảnh, bảng thông số hoặc heading không thuộc hạng mục đã chọn. Không sao chép bài tham khảo.",
     "Trả JSON thuần: {\"changes\":[{\"category\":\"cta|naturalness|claims|repetition|seo\",\"before\":\"đoạn nguyên văn\",\"after\":\"đoạn thay thế\",\"reason\":\"lý do ngắn\"}] }.",
     `HẠNG MỤC ĐƯỢC CHỌN:\n${categories.map((category) => `- ${category}: ${REVISION_CATEGORY_LABELS[category]}`).join("\n")}`,
@@ -604,7 +618,8 @@ router.post("/:id/selective-revision/preview", async (req, res) => {
     const before = typeof row.before === "string" ? row.before.trim() : "";
     const after = typeof row.after === "string" ? row.after.trim() : "";
     const reason = typeof row.reason === "string" ? row.reason.trim().slice(0, 500) : "";
-    if (!category || before.length < 12 || before.length > 6_000 || !after || after.length > 8_000 || before === after) return [];
+    const deletesUnverifiedText = !after && /\[CẦN KIỂM CHỨNG\]/i.test(before);
+    if (!category || before.length < 12 || before.length > 6_000 || (!after && !deletesUnverifiedText) || after.length > 8_000 || before === after) return [];
     if (exactOccurrenceCount(project.article, before) !== 1) return [];
     const start = project.article.indexOf(before);
     const end = start + before.length;
