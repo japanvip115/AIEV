@@ -55,6 +55,7 @@ export default function JapanVipLearningPage() {
   const [rule, setRule] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openArticleId, setOpenArticleId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -155,8 +156,8 @@ export default function JapanVipLearningPage() {
               const originalPassesGate = Boolean(review && review.totalScore >= 85 && review.accuracyScore >= 80);
               const canImprove = Boolean(approvalReview && approvalReview.totalScore >= 75 && !passesGate && article.approvalStatus !== "approved");
               return (
-              <details key={article.id} className="group overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]">
-                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--surface-subtle)] [&::-webkit-details-marker]:hidden">
+              <details key={article.id} open={openArticleId === article.id} className="group overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]">
+                <summary onClick={(event) => { event.preventDefault(); setOpenArticleId((current) => current === article.id ? null : article.id); }} className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--surface-subtle)] [&::-webkit-details-marker]:hidden">
                   <ChevronDown size={17} className="shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-180" />
                   {article.kind === "japanvip" ? <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${article.approvalStatus === "approved" ? "bg-emerald-100 text-emerald-700" : article.approvalStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{article.approvalStatus === "approved" ? <CheckCircle2 size={15} /> : article.approvalStatus === "rejected" ? <XCircle size={15} /> : <ShieldCheck size={15} />}</span> : <BookOpenCheck size={20} className="shrink-0 text-[var(--primary)]" />}
                   <div className="min-w-0 flex-1">
@@ -178,16 +179,14 @@ export default function JapanVipLearningPage() {
                     aria-label={`Bật ${article.title}`}
                     disabled={busy !== null}
                     onChange={(e) => void run(`article-${article.id}`, () => updateJapanVipReferenceArticle(article.id, { active: e.target.checked }))}
-                  /> : <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${article.approvalStatus === "approved" ? "bg-emerald-100 text-emerald-700" : article.approvalStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{article.approvalStatus === "approved" ? <CheckCircle2 size={15} /> : article.approvalStatus === "rejected" ? <XCircle size={15} /> : <ShieldCheck size={15} />}</span>}
+                  /> : null}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <a href={article.canonicalUrl ?? article.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-[var(--primary)]">
-                        {article.title} <ExternalLink size={13} />
+                        Mở bài gốc <ExternalLink size={13} />
                       </a>
-                      <Badge tone={article.kind === "japanvip" ? "success" : "muted"} label={KIND_LABEL[article.kind]} />
-                      {article.kind === "japanvip" && <Badge tone={article.approvalStatus === "approved" ? "success" : article.approvalStatus === "rejected" ? "danger" : "running"} label={article.approvalStatus === "approved" ? "Đã duyệt làm nguồn" : article.approvalStatus === "rejected" ? "Đã loại" : "Chờ duyệt"} />}
+                      {article.tags.length > 0 && <span className="text-xs text-[var(--text-muted)]">{article.tags.join(", ")}</span>}
                     </div>
-                    <p className="mt-1 text-meta text-[var(--text-muted)]">{article.siteName || "Nguồn web"} · {article.tags.join(", ") || "chưa gắn nhãn"}</p>
                     {article.analysis.reusableLessons.length > 0 && (
                       <details open className="group mt-3 overflow-hidden rounded-[var(--radius)] border-2 border-[var(--primary)] bg-[var(--surface)] shadow-sm">
                         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface))] px-4 py-3 marker:content-none">
