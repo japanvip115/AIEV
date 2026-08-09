@@ -3,6 +3,7 @@
 import { ArrowLeft, BookOpenCheck, CheckCircle2, ChevronDown, ExternalLink, Plus, RotateCcw, ShieldCheck, Sparkles, Trash2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
+import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -61,6 +62,9 @@ export default function JapanVipLearningPage() {
   const [error, setError] = useState<string | null>(null);
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
   const [improvementProviders, setImprovementProviders] = useState<Record<string, "ollama-cloud" | "codex">>({});
+  /** Báo phân tích xong. Không có nó thì nút vừa hết chữ "đang phân tích" là tắt
+      ngay (vì ô URL bị xóa), nhìn hệt như đang treo - không biết xong hay chưa. */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -78,8 +82,19 @@ export default function JapanVipLearningPage() {
   async function run(label: string, action: () => Promise<JapanVipLearningLibrary>) {
     setBusy(label);
     setError(null);
+    setNotice(null);
     try {
-      setLibrary(await action());
+      const before = new Set(library?.articles.map((article) => article.id) ?? []);
+      const next = await action();
+      setLibrary(next);
+      // Bài vừa được thêm thì mở sẵn chi tiết ra, để thấy ngay AI đã rút ra gì
+      // thay vì phải tự đi dò trong danh sách.
+      const added = next.articles.find((article) => !before.has(article.id));
+      if (added) {
+        setOpenArticleId(added.id);
+        const lessons = added.analysis.reusableLessons.length;
+        setNotice(`Đã phân tích xong “${added.title}” — rút ra ${lessons} bài học. Mở ngay bên dưới.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -97,6 +112,7 @@ export default function JapanVipLearningPage() {
         actions={<LinkButton href="/japanvip-content"><ArrowLeft size={15} /> Content Project</LinkButton>}
       />
       {error && <ErrorBanner message="Thao tác chưa hoàn tất" detail={error} />}
+      {notice && <Banner tone="success" message={notice} actions={<Button small variant="secondary" onClick={() => setNotice(null)}>Đóng</Button>} />}
 
       <Card title="Chấm bài đã xuất bản trên JapanVIP" actions={<Badge tone="success" label="Nguồn nội bộ" />}>
         <p className="mb-3 text-sm text-[var(--text-muted)]">
