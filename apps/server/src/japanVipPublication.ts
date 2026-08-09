@@ -306,8 +306,12 @@ function renderFigure(image: ArticleImage, inCell = false): string {
     : "";
   // Trong ô lưới thì ảnh lấp đầy ô đã có sẵn kích thước; ngoài lưới thì tự mang
   // chiều rộng của mình.
+  // Trong ô lưới thì ảnh LẤP ĐẦY ô: cover cắt phần thừa nên mọi ô đầy như nhau,
+  // không còn mảng nền xám hai bên. Riêng sơ đồ và bản vẽ kích thước thì không
+  // bao giờ cắt - cắt là mất số đo, và số đo mới là toàn bộ lý do có tấm ảnh đó.
+  const noCrop = image.role === "dimensions";
   const style = inCell
-    ? "display:block;width:100%;height:100%;object-fit:contain;border-radius:14px"
+    ? `display:block;width:100%;height:100%;object-fit:${noCrop ? "contain" : "cover"};object-position:center;border-radius:14px`
     : figureStyle(resolved, image);
   const margin = inCell ? "margin:0" : resolved.layout === "full" ? "margin:0 0 26px" : "margin:0";
   return `<figure style="${margin}"><img src="${src}" alt="${alt}"${size} loading="lazy" decoding="async" style="${style}"><figcaption-placeholder></figure>`
@@ -344,7 +348,7 @@ function renderGroup(images: ArticleImage[]): string {
     .filter(Boolean)
     .map((figure) => {
       const [, img = "", cap = ""] = figure.match(/^<figure[^>]*>(<img[^>]*>)(.*)<\/figure>$/s) ?? [];
-      return `<div style="flex:1 1 ${basis};min-width:${minWidth}px"><div style="aspect-ratio:1;background:#f8fafc;border-radius:14px;display:flex;align-items:center;justify-content:center;padding:8px;overflow:hidden">${img}</div>${cap}</div>`;
+      return `<div style="flex:1 1 ${basis};min-width:${minWidth}px"><div style="aspect-ratio:1;background:#f8fafc;border-radius:14px;overflow:hidden">${img}</div>${cap}</div>`;
     })
     .join("");
   // flex chứ không phải grid: `flex-basis` theo % cộng `min-width` cho đúng SỐ
