@@ -56,6 +56,7 @@ export function Banner({
 }) {
   const { t } = useT();
   const [openDetail, setOpenDetail] = useState(false);
+  const isLongDetail = Boolean(detail && (detail.length > 200 || detail.includes("\n")));
   const Icon = ICON[tone];
 
   return (
@@ -70,7 +71,15 @@ export function Banner({
         <div className="min-w-0 flex-1">
           <p>{message}</p>
           {children}
-          {detail && (
+          {/* Lý do NGẮN thì hiện thẳng, không giấu sau nút "Chi tiết".
+              Phần lớn lỗi ở đây là một câu tiếng Việt do server trả về
+              ("Bài viết này đã có trong thư viện") - bắt bấm thêm một lần mới
+              đọc được lý do là thừa. Chỉ log dài hoặc nhiều dòng mới đáng gấp
+              lại, vì thứ đó mới làm vỡ bố cục banner. */}
+          {detail && !isLongDetail && (
+            <p className="mt-1 text-meta [overflow-wrap:anywhere]">{detail}</p>
+          )}
+          {detail && isLongDetail && (
             <>
               <button
                 type="button"
