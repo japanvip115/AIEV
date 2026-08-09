@@ -1205,6 +1205,8 @@ GET    /api/japanvip-learning
 POST   /api/japanvip-learning/articles               { url, kind, tags? }
 POST   /api/japanvip-learning/japanvip-articles       { url, tags? }
 POST   /api/japanvip-learning/articles/:articleId/hermes-review
+POST   /api/japanvip-learning/articles/:articleId/improve
+POST   /api/japanvip-learning/articles/:articleId/improvement-review
 POST   /api/japanvip-learning/articles/:articleId/approve
 POST   /api/japanvip-learning/articles/:articleId/reject
 PATCH  /api/japanvip-learning/articles/:articleId
@@ -1215,6 +1217,8 @@ DELETE /api/japanvip-learning/rules/:ruleId
 ```
 
 Bài nhập qua `japanvip-articles` phải thuộc tên miền `japanvip.vn`, được Ollama Cloud (`OLLAMA_CLOUD_MODEL`, mặc định GPT-OSS 120B) chấm 6 tiêu chí và mặc định ở trạng thái chờ duyệt. Nếu Ollama Cloud lỗi hoặc trả sai schema, hệ thống tự chuyển sang Hermes CLI và ghi rõ evaluator trong kết quả. API `approve` chỉ chấp nhận khi tổng điểm từ 85/100 và tiêu chí độ chính xác từ 80/100; bài đã duyệt được tự động ưu tiên làm nguồn phong cách nội bộ, nhưng không thay thế nguồn hãng cho thông số/claim sản phẩm.
+
+- Bài Japan VIP đạt 75-84 điểm có thể gọi `improve` để tạo **bản cải thiện riêng**. Hệ thống chỉ nhận tối đa 8 thay đổi khớp chính xác, tổng phần bị thay không quá 35% và không sửa trường `text` của bài mẫu gốc. `improvement-review` chấm riêng bản cải thiện; khi đạt ngưỡng, `approve` duyệt biến thể này làm nguồn trong khi bản gốc vẫn được lưu nguyên vẹn.
 
 - `kind`: `competitor`, `inspiration` hoặc `japanvip`.
 - GPT qua Codex CLI chỉ phân tích cấu trúc, mở bài, SEO, cách thuyết phục và khoảng trống nội dung; không xác nhận

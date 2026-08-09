@@ -51,6 +51,14 @@ export interface JapanVipReferenceArticle {
   hermesReview: JapanVipLearningReview | null;
   approvalStatus: "pending" | "approved" | "rejected";
   approvedAt: string | null;
+  improvementDraft?: {
+    id: string;
+    changes: Array<{ id: string; before: string; after: string; reason: string }>;
+    improvedText: string;
+    review: JapanVipLearningReview | null;
+    createdAt: string;
+  } | null;
+  approvedVariant?: "original" | "improved";
   active: boolean;
   fetchedAt: string;
   createdAt: string;
@@ -216,6 +224,9 @@ export function japanVipLearningContext(selectedReferenceIds: string[]): string 
   const rules = library.rules.filter((rule) => rule.active);
   const articleContext = articles.map((article, index) => {
     const analysis = article.analysis;
+    const effectiveText = article.approvedVariant === "improved" && article.improvementDraft?.improvedText
+      ? article.improvementDraft.improvedText
+      : article.text;
     return [
       `### BÀI THAM KHẢO ${index + 1}: ${article.title}`,
       `Loại: ${article.kind}`,
@@ -228,7 +239,7 @@ export function japanVipLearningContext(selectedReferenceIds: string[]): string 
       analysis.reusableLessons.length ? `Bài học có thể áp dụng: ${analysis.reusableLessons.join(" | ")}` : "",
       analysis.weaknesses.length ? `Điểm cần làm tốt hơn: ${analysis.weaknesses.join(" | ")}` : "",
       analysis.avoidCopying.length ? `Không được sao chép: ${analysis.avoidCopying.join(" | ")}` : "",
-      `Trích đoạn chỉ để nhận diện nhịp điệu, KHÔNG sao chép câu chữ:\n${article.text.slice(0, 3_000)}`,
+      `Trích đoạn chỉ để nhận diện nhịp điệu, KHÔNG sao chép câu chữ:\n${effectiveText.slice(0, 3_000)}`,
     ].filter(Boolean).join("\n");
   }).join("\n\n");
   return [
@@ -250,7 +261,8 @@ export function findCopiedReferenceExcerpt(article: string, selectedReferenceIds
   const output = comparable(article);
   for (const reference of readJapanVipLearningLibrary().articles) {
     if (!reference.active || (reference.kind !== "japanvip" && !selected.has(reference.id))) continue;
-    const candidates = reference.text
+    const effectiveText = reference.approvedVariant === "improved" && reference.improvementDraft?.improvedText ? reference.improvementDraft.improvedText : reference.text;
+    const candidates = effectiveText
       .split(/(?<=[.!?…])\s+|\n+/)
       .map((sentence) => comparable(sentence))
       .filter((sentence) => sentence.length >= 120 && sentence.length <= 500);

@@ -15,7 +15,7 @@ import {
 } from "../japanVipLearning.js";
 import { HttpError, nowIso } from "../util.js";
 import { getOllamaStatus } from "../ollamaText.js";
-import { getOllamaCloudStatus } from "../ollamaCloudText.js";
+import { generateOllamaCloudText, getOllamaCloudStatus } from "../ollamaCloudText.js";
 
 const router = Router();
 const KINDS = new Set<JapanVipReferenceKind>(["competitor", "inspiration", "japanvip"]);
@@ -27,7 +27,11 @@ function publicLibrary() {
   return {
     ...library,
     // Nội dung toàn bài chỉ lưu cục bộ để tạo context; UI chỉ cần metadata + phân tích.
-    articles: library.articles.map((article) => ({ ...article, text: "" })),
+    articles: library.articles.map((article) => ({
+      ...article,
+      text: "",
+      improvementDraft: article.improvementDraft ? { ...article.improvementDraft, improvedText: "" } : article.improvementDraft,
+    })),
   };
 }
 
@@ -84,6 +88,27 @@ async function importJapanVipArticle(url: string, tags: string[]) {
   };
   library.articles.unshift(article);
   writeJapanVipLearningLibrary(library);
+}
+
+function buildImprovedCopy(original: string, rawChanges: unknown) {
+  if (!Array.isArray(rawChanges)) throw new HttpError(502, "INVALID_IMPROVEMENT", "AI không trả về danh sách chỉnh sửa hợp lệ");
+  const changes = rawChanges.slice(0, 8).map((value) => {
+    const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    return { id: nanoid(8), before: String(row.before ?? "").trim(), after: String(row.after ?? "").trim(), reason: String(row.reason ?? "").trim().slice(0, 500) };
+  }).filter((change) => change.before && change.after && change.before !== change.after);
+  if (!changes.length) throw new HttpError(502, "NO_IMPROVEMENTS", "AI chưa đề xuất được chỉnh sửa cục bộ");
+  const positioned = changes.map((change) => {
+    const first = original.indexOf(change.before);
+    if (first < 0 || original.indexOf(change.before, first + change.before.length) >= 0) throw new HttpError(502, "IMPROVEMENT_NOT_EXACT", "Đoạn AI muốn sửa không khớp duy nhất với bản gốc");
+    return { ...change, index: first };
+  }).sort((a, b) => b.index - a.index);
+  for (let i = 1; i < positioned.length; i += 1) {
+    if (positioned[i - 1].index < positioned[i].index + positioned[i].before.length) throw new HttpError(502, "IMPROVEMENT_OVERLAP", "Các chỉnh sửa AI đề xuất bị chồng lấn");
+  }
+  if (positioned.reduce((sum, item) => sum + item.before.length, 0) > original.length * 0.35) throw new HttpError(502, "IMPROVEMENT_TOO_LARGE", "AI đề xuất thay quá nhiều nội dung; bản gốc được giữ nguyên");
+  let improvedText = original;
+  for (const change of positioned) improvedText = improvedText.slice(0, change.index) + change.after + improvedText.slice(change.index + change.before.length);
+  return { changes: positioned.map(({ index: _index, ...change }) => change), improvedText };
 }
 
 router.get("/", (_req, res) => res.json(publicLibrary()));
@@ -167,15 +192,47 @@ router.post("/articles/:articleId/hermes-review", async (req, res) => {
   res.json(publicLibrary());
 });
 
+router.post("/articles/:articleId/improve", async (req, res) => {
+  const library = readJapanVipLearningLibrary();
+  const article = library.articles.find((item) => item.id === req.params.articleId);
+  if (!article || article.kind !== "japanvip") throw new HttpError(404, "JAPANVIP_REFERENCE_NOT_FOUND", "Không tìm thấy bài Japan VIP");
+  if (!article.hermesReview || article.hermesReview.totalScore < 75 || article.hermesReview.totalScore >= 85) throw new HttpError(409, "NOT_NEAR_APPROVAL", "Chỉ cải thiện chọn lọc bài đạt từ 75 đến 84 điểm");
+  const lowFeedback = article.hermesReview.criteria.filter((item) => item.score < 85).map((item) => `- ${item.label} ${item.score}/100: ${item.feedback}`).join("\n");
+  const prompt = [
+    "Bạn là biên tập viên Japan VIP. Chỉ đề xuất chỉnh sửa CỤC BỘ cho các tiêu chí điểm thấp.",
+    "Không viết lại toàn bài, không đổi thông số/claim, không thêm dữ kiện mới. Mỗi before phải là đoạn trích nguyên văn xuất hiện đúng một lần trong bài gốc.",
+    "Tối đa 8 thay đổi. Trả JSON thuần: {\"changes\":[{\"before\":\"\",\"after\":\"\",\"reason\":\"\"}]}",
+    `ĐIỂM CẦN CẢI THIỆN:\n${lowFeedback}`,
+    `BÀI GỐC BẤT BIẾN:\n${article.text.slice(0, 60_000)}`,
+  ].join("\n\n");
+  const ai = await generateOllamaCloudText({ prompt, usageTag: "japanvip-selective-improvement", jsonMode: true });
+  const parsed = extractJson<Record<string, unknown>>(ai.text);
+  const built = buildImprovedCopy(article.text, parsed?.changes);
+  article.improvementDraft = { id: nanoid(10), ...built, review: null, createdAt: nowIso() };
+  article.approvalStatus = "pending"; article.active = false; article.updatedAt = nowIso();
+  writeJapanVipLearningLibrary(library);
+  res.json(publicLibrary());
+});
+
+router.post("/articles/:articleId/improvement-review", async (req, res) => {
+  const library = readJapanVipLearningLibrary();
+  const article = library.articles.find((item) => item.id === req.params.articleId);
+  if (!article?.improvementDraft) throw new HttpError(404, "IMPROVEMENT_NOT_FOUND", "Chưa có bản cải thiện để chấm");
+  const result = await analyzeJapanVipArticle(article.improvementDraft.improvedText, article.title);
+  article.improvementDraft.review = result.review; article.updatedAt = nowIso();
+  writeJapanVipLearningLibrary(library); res.json(publicLibrary());
+});
+
 router.post("/articles/:articleId/approve", (req, res) => {
   const library = readJapanVipLearningLibrary();
   const article = library.articles.find((item) => item.id === req.params.articleId);
   if (!article || article.kind !== "japanvip") throw new HttpError(404, "JAPANVIP_REFERENCE_NOT_FOUND", "Không tìm thấy bài Japan VIP");
-  const review = article.hermesReview;
+  const review = article.improvementDraft?.review ?? article.hermesReview;
   if (!review || review.totalScore < JAPANVIP_APPROVAL_SCORE || review.accuracyScore < JAPANVIP_ACCURACY_SCORE) {
     throw new HttpError(409, "JAPANVIP_APPROVAL_GATE_FAILED", `Bài cần đạt tổng ${JAPANVIP_APPROVAL_SCORE}/100 và độ chính xác ${JAPANVIP_ACCURACY_SCORE}/100`);
   }
   article.approvalStatus = "approved";
+  article.approvedVariant = article.improvementDraft?.review ? "improved" : "original";
   article.approvedAt = nowIso();
   article.active = true;
   article.updatedAt = nowIso();
