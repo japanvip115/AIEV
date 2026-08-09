@@ -35,6 +35,7 @@ const STATUSES = new Set<JapanVipContentStatus>([
 const IMAGE_ROLES = new Set<JapanVipImageRole>(["hero", "main-packshot", "alternate-angle", "feature", "feature-small", "detail", "dimensions", "maintenance"]);
 const IMAGE_STATUSES = new Set<JapanVipImageStatus>(["pending", "approved", "rejected"]);
 const REVISION_CATEGORIES = new Set<JapanVipRevisionCategory>(["cta", "naturalness", "claims", "repetition", "seo"]);
+const MIN_MANUAL_SOURCE_CHARS = 20;
 const REVISION_CATEGORY_LABELS: Record<JapanVipRevisionCategory, string> = {
   cta: "CTA và tư vấn mua hàng",
   naturalness: "câu mang văn phong dịch hoặc thiếu tự nhiên",
@@ -360,7 +361,12 @@ router.post("/:id/sources/manual", (req, res) => {
   if (!url) throw new HttpError(400, "INVALID_URL", "Thiếu URL của nguồn được dán thủ công");
   let hostname = "";
   try { hostname = new URL(url).hostname; } catch { throw new HttpError(400, "INVALID_URL", "URL nguồn không hợp lệ"); }
-  if (text.length < 200) throw new HttpError(400, "MANUAL_SOURCE_TOO_SHORT", "Nội dung dán thủ công cần ít nhất 200 ký tự");
+  if (text.length < MIN_MANUAL_SOURCE_CHARS) {
+    throw new HttpError(400, "MANUAL_SOURCE_TOO_SHORT", `Nội dung dán thủ công cần ít nhất ${MIN_MANUAL_SOURCE_CHARS} ký tự`);
+  }
+  if (/^https?:\/\/\S+$/i.test(text)) {
+    throw new HttpError(400, "MANUAL_SOURCE_URL_ONLY", "Ô nội dung cần câu chữ hoặc thông số từ trang hãng, không phải URL");
+  }
   if (project.sources.length >= 12) throw new HttpError(400, "SOURCE_LIMIT", "Mỗi Content Project nhận tối đa 12 nguồn");
   if (project.sources.some((source) => (source.canonicalUrl ?? source.url) === url)) {
     throw new HttpError(409, "SOURCE_EXISTS", "Nguồn này đã có trong project");
