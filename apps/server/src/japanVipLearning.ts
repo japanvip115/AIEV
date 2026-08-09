@@ -40,6 +40,7 @@ export interface JapanVipLearningReview {
 
 export interface JapanVipReferenceArticle {
   id: string;
+  sourceProjectId?: string;
   kind: JapanVipReferenceKind;
   url: string;
   canonicalUrl: string | null;

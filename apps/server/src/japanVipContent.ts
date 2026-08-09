@@ -117,6 +117,14 @@ export interface JapanVipContentProject {
   hermesReviews: JapanVipHermesReview[];
   selectiveRevision: JapanVipSelectiveRevision | null;
   images: JapanVipContentImage[];
+  learningReferenceId: string | null;
+  publicationPackage: {
+    fileName: string;
+    fingerprint: string;
+    reviewScore: number;
+    approvedImageCount: number;
+    generatedAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +137,8 @@ function normalizeProject(project: JapanVipContentProject): JapanVipContentProje
     feedback: Array.isArray(project.feedback) ? project.feedback.map((item) => ({ ...item, ruleId: typeof item.ruleId === "string" ? item.ruleId : null })) : [],
     hermesReviews: Array.isArray(project.hermesReviews) ? project.hermesReviews : [],
     selectiveRevision: project.selectiveRevision && typeof project.selectiveRevision === "object" ? project.selectiveRevision : null,
+    learningReferenceId: typeof project.learningReferenceId === "string" ? project.learningReferenceId : null,
+    publicationPackage: project.publicationPackage && typeof project.publicationPackage === "object" ? project.publicationPackage : null,
     images: Array.isArray(project.images) ? project.images.map((image) => ({
       ...image,
       selectionOrigin: image.selectionOrigin === "auto" ? "auto" : "manual",
@@ -214,6 +224,8 @@ export function createJapanVipContent(input: {
     hermesReviews: [],
     selectiveRevision: null,
     images: [],
+    learningReferenceId: null,
+    publicationPackage: null,
     createdAt: now,
     updatedAt: now,
   };

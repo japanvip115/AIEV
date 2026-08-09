@@ -1192,6 +1192,9 @@ DELETE /api/japanvip-content/:id/sources/:sourceId
 POST   /api/japanvip-content/:id/generate-outline
 POST   /api/japanvip-content/:id/generate-article
 POST   /api/japanvip-content/:id/feedback            { category, note, saveAsRule }
+POST   /api/japanvip-content/:id/approve-as-learning
+POST   /api/japanvip-content/:id/publication-package
+GET    /api/japanvip-content/:id/publication-package/download
 ```
 
 - Nguồn URL đi qua cùng lớp `safeFetchHtml` và Readability của Text to video.
@@ -1200,6 +1203,13 @@ POST   /api/japanvip-content/:id/feedback            { category, note, saveAsRul
 - AI tạo dàn ý và bài Markdown bằng Codex CLI dùng phiên ChatGPT hiện tại; claim thiếu bằng chứng phải giữ
   nhãn `[CẦN KIỂM CHỨNG]`.
 - MVP không có endpoint xuất bản CMS. Trạng thái `approved` chỉ ghi nhận đã duyệt nội bộ.
+- `approve-as-learning` là xác nhận riêng sau duyệt: bài phải đạt tổng từ 85 và độ chính xác từ 80.
+  Endpoint không gọi AI lần nữa; nó chuyển bảng điểm và kỹ thuật viết đã có thành một bài mẫu nội bộ có
+  `sourceProjectId`, cho phép cập nhật idempotent thay vì tạo bản trùng.
+- `publication-package` không đăng CMS. Endpoint chặn khi bài chưa duyệt, chưa qua cổng điểm, thiếu model,
+  còn `[CẦN KIỂM CHỨNG]`, thiếu nguồn, có dưới 5 ảnh duyệt, thiếu hero hoặc lặp URL ảnh. Khi đạt, endpoint
+  tạo metadata gói; route `download` trả ZIP gồm `article.md`, `article-package.json`, `images.json`,
+  `sources-internal.json`, `facts-internal.txt` và README. Nguồn/fact nội bộ không được dán vào bài công khai.
 
 ### Thư viện AI học nội dung
 

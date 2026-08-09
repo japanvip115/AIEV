@@ -2984,6 +2984,14 @@ export interface JapanVipContentProject {
     selectionReason?: string;
     discoveredAt: string;
   }>;
+  learningReferenceId: string | null;
+  publicationPackage: {
+    fileName: string;
+    fingerprint: string;
+    reviewScore: number;
+    approvedImageCount: number;
+    generatedAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2993,6 +3001,15 @@ export const getJapanVipContentProjects = () =>
 
 export const getJapanVipContentProject = (id: string) =>
   request<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}`);
+
+export const approveJapanVipContentAsLearning = (id: string) =>
+  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/approve-as-learning`);
+
+export const prepareJapanVipPublicationPackage = (id: string) =>
+  post<JapanVipContentProject>(`/api/japanvip-content/${encodeURIComponent(id)}/publication-package`);
+
+export const japanVipPublicationPackageDownloadUrl = (id: string) =>
+  `/api/japanvip-content/${encodeURIComponent(id)}/publication-package/download`;
 
 export interface JapanVipImageLearningProfile {
   mode: "manual" | "hybrid";

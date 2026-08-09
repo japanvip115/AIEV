@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Brain, CheckCircle2, ClipboardPaste, Database, ExternalLink, FileCheck2, Images, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
+import { ArrowLeft, Brain, CheckCircle2, ClipboardPaste, Database, Download, ExternalLink, FileCheck2, Images, Package, PenTool, Plus, Save, Sparkles, Trash2, ShieldCheck, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,6 +15,7 @@ import {
   addJapanVipContentSource,
   addJapanVipManualContentSource,
   addJapanVipContentFeedback,
+  approveJapanVipContentAsLearning,
   deleteJapanVipContentSource,
   deleteJapanVipContentImage,
   deleteJapanVipContentFeedback,
@@ -28,6 +29,8 @@ import {
   getJapanVipContentProject,
   getJapanVipImageLearningProfile,
   getJapanVipLearningLibrary,
+  japanVipPublicationPackageDownloadUrl,
+  prepareJapanVipPublicationPackage,
   updateJapanVipContentProject,
   updateJapanVipContentImage,
   type JapanVipContentProject,
@@ -498,7 +501,23 @@ export default function JapanVipContentDetailPage() {
             <Field label="Ghi chú biên tập" htmlFor="jvc-notes">
               <textarea id="jvc-notes" className="input min-h-28 resize-y" value={draft.notes} onChange={(e) => patch("notes", e.target.value)} placeholder="Điểm cần sửa, claim cần kiểm chứng, yêu cầu bổ sung ảnh…" />
             </Field>
-            <p className="mt-3 text-meta text-[var(--text-muted)]">MVP chưa có chức năng xuất bản lên japanvip.vn. Nội dung phải được duyệt trước khi tích hợp CMS.</p>
+            <p className="mt-3 text-meta text-[var(--text-muted)]">Duyệt nội bộ không tự đưa bài vào bộ nhớ AI và không tự đăng lên japanvip.vn.</p>
+            {draft.status === "approved" && <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <p className="text-sm font-semibold">Bước sau khi duyệt</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Hai thao tác độc lập, chỉ chạy khi bạn bấm. Tạo bài mẫu không gọi AI; gói đăng chỉ chuẩn bị tệp tải xuống và không thay đổi CMS.</p>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+                  <div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface))] text-[var(--primary)]"><Brain size={17} /></span><div><p className="font-semibold">Duyệt làm bài mẫu cho AI</p><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Lưu bài đã đạt cổng điểm vào thư viện phong cách nội bộ. Dữ kiện của bài không được dùng thay nguồn hãng.</p></div></div>
+                  <Button className="mt-3" small variant="secondary" disabled={busy !== null || Boolean(draft.learningReferenceId)} onClick={() => void run("approve-learning", async () => { const next = await approveJapanVipContentAsLearning(id); setLearning(await getJapanVipLearningLibrary()); return next; })}><Brain size={14} /> {draft.learningReferenceId ? "Đã lưu làm bài mẫu" : busy === "approve-learning" ? "Đang lưu…" : "Duyệt làm mẫu cho AI"}</Button>
+                </div>
+                <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+                  <div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface))] text-[var(--primary)]"><Package size={17} /></span><div><p className="font-semibold">Chuẩn bị bản đăng Japan VIP</p><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Kiểm tra điểm, claim chưa xác minh, nguồn và ảnh; sau đó tạo ZIP gồm Markdown cùng manifest ảnh, nguồn và fact nội bộ.</p></div></div>
+                  {(draft.article.match(/\[CẦN KIỂM CHỨNG\]/gi)?.length ?? 0) > 0 && <p className="mt-3 rounded-[var(--radius)] bg-amber-50 px-3 py-2 text-xs text-amber-800">Đang chặn tạo gói: còn {draft.article.match(/\[CẦN KIỂM CHỨNG\]/gi)?.length} nhãn [CẦN KIỂM CHỨNG] trong bài.</p>}
+                  <div className="mt-3 flex flex-wrap gap-2"><Button small variant="secondary" disabled={busy !== null} onClick={() => void run("publication-package", () => prepareJapanVipPublicationPackage(id))}><Package size={14} /> {busy === "publication-package" ? "Đang kiểm tra…" : draft.publicationPackage ? "Tạo lại gói đăng" : "Kiểm tra & tạo gói đăng"}</Button>{draft.publicationPackage && <a className="btn btn-secondary btn-sm" href={japanVipPublicationPackageDownloadUrl(id)} download={draft.publicationPackage.fileName}><Download size={14} /> Tải ZIP</a>}</div>
+                  {draft.publicationPackage && <p className="mt-2 text-[11px] text-emerald-700">Đã tạo gói {draft.publicationPackage.reviewScore}/100 · {draft.publicationPackage.approvedImageCount} ảnh · {new Date(draft.publicationPackage.generatedAt).toLocaleString("vi-VN")}</p>}
+                </div>
+              </div>
+            </div>}
             <div className="mt-4 border-t border-[var(--border)] pt-4">
               <p className="mb-2 text-sm font-semibold">Dạy AI từ lần chỉnh sửa này</p>
               <div className="grid gap-2 sm:grid-cols-[220px_minmax(0,1fr)]">

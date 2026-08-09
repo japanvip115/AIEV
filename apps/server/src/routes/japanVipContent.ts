@@ -22,6 +22,7 @@ import { runJapanVipCritic } from "../japanVipCritic.js";
 import { discoverJapanVipImages } from "../japanVipImages.js";
 import { researchOfficialProduct } from "../officialProductResearch.js";
 import { applyLearnedImageSelection, getJapanVipImageLearningProfile, recordExplicitImageDecision, removeExplicitImageDecision } from "../japanVipImageLearning.js";
+import { approveJapanVipProjectAsLearning, buildJapanVipPublicationZip, deactivateJapanVipProjectLearning, prepareJapanVipPublicationPackage, publicationFingerprint } from "../japanVipPublication.js";
 
 const router = Router();
 const STATUSES = new Set<JapanVipContentStatus>([
@@ -44,6 +45,13 @@ const REVISION_CATEGORY_LABELS: Record<JapanVipRevisionCategory, string> = {
 
 function articleFingerprint(article: string): string {
   return createHash("sha256").update(article).digest("hex");
+}
+
+function invalidateArticleApproval(project: JapanVipContentProject): void {
+  project.publicationPackage = null;
+  if (project.learningReferenceId) deactivateJapanVipProjectLearning(project.learningReferenceId);
+  project.learningReferenceId = null;
+  if (project.status === "approved") project.status = "review";
 }
 
 function exactOccurrenceCount(haystack: string, needle: string): number {
@@ -231,10 +239,35 @@ router.post("/auto", async (req, res) => {
   }
 });
 
+router.post("/:id/approve-as-learning", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  project.learningReferenceId = approveJapanVipProjectAsLearning(project);
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
+router.post("/:id/publication-package", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  project.publicationPackage = prepareJapanVipPublicationPackage(project);
+  writeJapanVipContent(project);
+  res.json(project);
+});
+
+router.get("/:id/publication-package/download", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  const archive = buildJapanVipPublicationZip(project);
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${project.publicationPackage?.fileName ?? `${project.id}-japanvip.zip`}"`);
+  res.send(archive);
+});
+
 router.get("/:id", (req, res) => res.json(readJapanVipContent(req.params.id)));
 
 router.patch("/:id", (req, res) => {
   const project = readJapanVipContent(req.params.id);
+  const beforeArticle = project.article;
+  const beforePublicationFingerprint = publicationFingerprint(project);
+  const beforeLearningInput = JSON.stringify([project.name, project.productModel, project.targetKeyword, project.article]);
   const body = (req.body ?? {}) as Record<string, unknown>;
   for (const key of [
     "name",
@@ -269,12 +302,21 @@ router.patch("/:id", (req, res) => {
     project.status = body.status as JapanVipContentStatus;
   }
   if (!project.name) throw new HttpError(400, "INVALID_NAME", "Tên project không được để trống");
+  if (beforeArticle !== project.article) invalidateArticleApproval(project);
+  if (project.publicationPackage && beforePublicationFingerprint !== publicationFingerprint(project)) project.publicationPackage = null;
+  const learningInputChanged = beforeLearningInput !== JSON.stringify([project.name, project.productModel, project.targetKeyword, project.article]);
+  if (project.learningReferenceId && (learningInputChanged || project.status !== "approved")) {
+    deactivateJapanVipProjectLearning(project.learningReferenceId);
+    project.learningReferenceId = null;
+  }
   if (project.selectiveRevision && articleFingerprint(project.article) !== project.selectiveRevision.articleFingerprint) project.selectiveRevision = null;
   writeJapanVipContent(project);
   res.json(project);
 });
 
 router.delete("/:id", (req, res) => {
+  const project = readJapanVipContent(req.params.id);
+  if (project.learningReferenceId) deactivateJapanVipProjectLearning(project.learningReferenceId);
   deleteJapanVipContent(req.params.id);
   res.status(204).end();
 });
@@ -304,6 +346,7 @@ router.post("/:id/sources", async (req, res) => {
   });
   if (!project.primaryUrl) project.primaryUrl = canonical;
   project.status = "researching";
+  project.publicationPackage = null;
   writeJapanVipContent(project);
   res.status(201).json(project);
 });
@@ -330,6 +373,7 @@ router.post("/:id/sources/manual", (req, res) => {
   });
   if (!project.primaryUrl) project.primaryUrl = url;
   project.status = "researching";
+  project.publicationPackage = null;
   writeJapanVipContent(project);
   res.status(201).json(project);
 });
@@ -341,6 +385,7 @@ router.delete("/:id/sources/:sourceId", (req, res) => {
     throw new HttpError(404, "SOURCE_NOT_FOUND", "Không tìm thấy nguồn cần xóa");
   }
   project.sources = next;
+  project.publicationPackage = null;
   writeJapanVipContent(project);
   res.json(project);
 });
@@ -364,6 +409,7 @@ router.post("/:id/images/discover", async (req, res) => {
   }
   project.images = project.images.slice(0, 240);
   applyLearnedImageSelection({ projectModel: project.productModel, primaryUrl: project.primaryUrl, images: project.images });
+  project.publicationPackage = null;
   writeJapanVipContent(project);
   res.status(201).json(project);
 });
@@ -384,6 +430,7 @@ router.patch("/:id/images/:imageId", (req, res) => {
     if (image.status === "pending") removeExplicitImageDecision(project.id, image.id);
     else recordExplicitImageDecision(project.id, image);
   }
+  project.publicationPackage = null;
   writeJapanVipContent(project);
   res.json(project);
 });
@@ -394,6 +441,7 @@ router.delete("/:id/images/:imageId", (req, res) => {
   if (next.length === project.images.length) throw new HttpError(404, "IMAGE_NOT_FOUND", "Không tìm thấy ảnh trong project");
   removeExplicitImageDecision(project.id, req.params.imageId);
   project.images = next;
+  project.publicationPackage = null;
   writeJapanVipContent(project);
   res.json(project);
 });
@@ -497,6 +545,7 @@ router.post("/:id/generate-article", async (req, res) => {
       `AI đã lặp lại một câu dài từ bài tham khảo (\"${copiedExcerpt}…\"). Hãy tạo lại bài để bảo đảm nội dung nguyên bản.`,
     );
   }
+  invalidateArticleApproval(project);
   project.article = article;
   project.selectiveRevision = null;
   project.status = "review";
@@ -592,6 +641,7 @@ router.post("/:id/selective-revision/apply", (req, res) => {
   for (const change of replacements) article = article.slice(0, change.start) + change.after + article.slice(change.start + change.before.length);
   const copiedExcerpt = findCopiedReferenceExcerpt(article, project.selectedReferenceIds);
   if (copiedExcerpt) throw new HttpError(502, "ARTICLE_TOO_SIMILAR", "Bản sửa lặp lại câu dài từ bài tham khảo");
+  invalidateArticleApproval(project);
   project.article = article;
   project.selectiveRevision = null;
   project.status = "review";
