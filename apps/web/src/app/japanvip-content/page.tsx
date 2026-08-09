@@ -1,16 +1,17 @@
 "use client";
 
 import { Brain, FileText, Plus, Sparkles, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, type BadgeTone } from "@/components/Badge";
+import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Field } from "@/components/Field";
 import { IconButton } from "@/components/IconButton";
+import { LinkButton } from "@/components/LinkButton";
 import { Modal } from "@/components/Modal";
 import { PageHeader } from "@/components/PageHeader";
 import { Toolbar } from "@/components/Toolbar";
@@ -20,17 +21,9 @@ import {
   deleteJapanVipContentProject,
   getJapanVipContentProjects,
   type JapanVipContentProject,
-  type JapanVipContentStatus,
 } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-
-const STATUS: Record<JapanVipContentStatus, { label: string; tone: BadgeTone }> = {
-  draft: { label: "Nháp", tone: "muted" },
-  researching: { label: "Đang nghiên cứu", tone: "running" },
-  writing: { label: "Đang viết", tone: "running" },
-  review: { label: "Chờ duyệt", tone: "running" },
-  approved: { label: "Đã duyệt", tone: "success" },
-};
+import { STATUS } from "./shared";
 
 export default function JapanVipContentPage() {
   const router = useRouter();
@@ -46,6 +39,11 @@ export default function JapanVipContentPage() {
   const [autoUrl, setAutoUrl] = useState("");
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
+  // Xóa project là thao tác phá hủy dữ liệu -> ConfirmDeleteModal (gõ DELETE),
+  // đúng như mọi trang danh sách khác. window.confirm ở đây là chỗ duy nhất còn sót.
+  const [pendingDelete, setPendingDelete] = useState<JapanVipContentProject | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -86,13 +84,18 @@ export default function JapanVipContentPage() {
     }
   }
 
-  async function remove(project: JapanVipContentProject) {
-    if (!window.confirm(`Xóa Content Project “${project.name}”?`)) return;
+  async function remove() {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
     try {
-      await deleteJapanVipContentProject(project.id);
+      await deleteJapanVipContentProject(pendingDelete.id);
+      setPendingDelete(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setDeleteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -118,7 +121,7 @@ export default function JapanVipContentPage() {
         subtitle="Nghiên cứu nguồn chính thức, lập fact sheet, viết bài SEO và duyệt trước khi xuất bản."
         actions={
           <>
-            <Link href="/japanvip-content/learning" className="btn btn-secondary"><Brain size={16} /> AI học nội dung</Link>
+            <LinkButton href="/japanvip-content/learning"><Brain size={16} /> AI học nội dung</LinkButton>
             <Button onClick={() => setOpen(true)}><Plus size={16} /> Tạo Content Project</Button>
           </>
         }
@@ -167,7 +170,7 @@ export default function JapanVipContentPage() {
                     <td>{p.facts.length}</td>
                     <td className="text-[var(--text-muted)]">{formatDateTime(p.updatedAt)}</td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <IconButton label={`Xóa ${p.name}`} size="sm" tone="danger" onClick={() => void remove(p)}>
+                      <IconButton label={`Xóa ${p.name}`} size="sm" tone="danger" onClick={() => { setDeleteError(null); setPendingDelete(p); }}>
                         <Trash2 size={15} />
                       </IconButton>
                     </td>
@@ -208,6 +211,15 @@ export default function JapanVipContentPage() {
           <input id="jvc-url" className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.zojirushi.co.jp/..." />
         </Field>
       </Modal>
+
+      <ConfirmDeleteModal
+        open={pendingDelete !== null}
+        description={pendingDelete ? `Xóa Content Project “${pendingDelete.name}” cùng toàn bộ nguồn, fact, ảnh và bản thảo của nó. Không khôi phục được.` : undefined}
+        busy={deleteBusy}
+        error={deleteError}
+        onClose={() => !deleteBusy && setPendingDelete(null)}
+        onConfirm={() => void remove()}
+      />
     </div>
   );
 }
