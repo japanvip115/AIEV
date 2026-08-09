@@ -475,7 +475,39 @@ export function buildJapanVipArticleHtml(project: JapanVipContentProject): strin
   // Ảnh AI đã tự chèn trong Markdown thì hệ thống KHÔNG bố trí lại lần nữa,
   // nếu không cùng một hình xuất hiện hai lần trong bài.
   const used = new Set<string>();
-  let body = markdownToHtml(stripSourceMarkers(project.article.trim()), byUrl, used);
+  let markdown = stripSourceMarkers(project.article.trim());
+
+  // GOM ẢNH TÍNH NĂNG NHỎ THÀNH MỘT HÀNG.
+  // Người viết rải mỗi ảnh nhỏ xuống dưới một đoạn khác nhau, nên không tấm nào
+  // đứng liền tấm nào và mỗi tấm hiện lẻ loi ở 300px giữa bài rộng 840px - trông
+  // như ảnh bị lỗi. Rút hết chúng ra khỏi vị trí lẻ rồi đặt lại thành một hàng
+  // tại chỗ tấm ĐẦU TIÊN xuất hiện, giữ được ngữ cảnh mà vẫn đúng luật "gom 4".
+  const smallImages: ArticleImage[] = [];
+  const byVariantAll = new Map(approved.map((image) => [variantKey(image.url), image]));
+  const lines = markdown.split("\n");
+  let firstSmallLine = -1;
+  const kept = lines.filter((line, lineIndex) => {
+    const match = line.trim().match(/^!\[[^\]]*\]\((https?:\/\/[^)]+)\)$/);
+    if (!match) return true;
+    const image = byUrl.get(imageKey(match[1])) ?? byVariantAll.get(variantKey(match[1]));
+    if (!image || image.role !== "feature-small") return true;
+    if (!smallImages.some((item) => item.id === image.id)) smallImages.push(image);
+    if (firstSmallLine === -1) firstSmallLine = lineIndex;
+    return false;
+  });
+  const SMALL_ROW_TOKEN = "JVSMALLROW";
+  if (smallImages.length >= 2 && firstSmallLine >= 0) {
+    // Đếm lại vị trí sau khi đã rút các dòng ảnh nhỏ ra.
+    const before = lines.slice(0, firstSmallLine).filter((line) => kept.includes(line)).length;
+    kept.splice(Math.min(before, kept.length), 0, "", SMALL_ROW_TOKEN, "");
+    for (const image of smallImages) used.add(image.id);
+    markdown = kept.join("\n");
+  }
+
+  let body = markdownToHtml(markdown, byUrl, used);
+  if (smallImages.length >= 2) {
+    body = body.replace(`<p>${SMALL_ROW_TOKEN}</p>`, renderGroup(smallImages));
+  }
 
   const remaining = (role: ArticleImage["role"]) => approved.filter((image) => image.role === role && !used.has(image.id));
   const hero = remaining("hero")[0];
