@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookOpenCheck, CheckCircle2, ExternalLink, Plus, RotateCcw, ShieldCheck, Sparkles, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, CheckCircle2, ChevronDown, ExternalLink, Plus, RotateCcw, ShieldCheck, Sparkles, Trash2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
@@ -146,6 +146,7 @@ export default function JapanVipLearningPage() {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <Card title="Thư viện bài tham khảo">
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Bấm vào từng bài để mở chi tiết. Việc mở hoặc thu gọn không gọi AI và không tốn hạn mức.</p>
           <div className="flex flex-col gap-3">
             {library.articles.map((article) => {
               const review = article.hermesReview;
@@ -154,7 +155,21 @@ export default function JapanVipLearningPage() {
               const originalPassesGate = Boolean(review && review.totalScore >= 85 && review.accuracyScore >= 80);
               const canImprove = Boolean(approvalReview && approvalReview.totalScore >= 75 && !passesGate && article.approvalStatus !== "approved");
               return (
-              <div key={article.id} className="rounded-[var(--radius)] border border-[var(--border)] p-4">
+              <details key={article.id} className="group overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]">
+                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--surface-subtle)] [&::-webkit-details-marker]:hidden">
+                  <ChevronDown size={17} className="shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-180" />
+                  {article.kind === "japanvip" ? <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${article.approvalStatus === "approved" ? "bg-emerald-100 text-emerald-700" : article.approvalStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{article.approvalStatus === "approved" ? <CheckCircle2 size={15} /> : article.approvalStatus === "rejected" ? <XCircle size={15} /> : <ShieldCheck size={15} />}</span> : <BookOpenCheck size={20} className="shrink-0 text-[var(--primary)]" />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="truncate font-medium">{article.title}</span>
+                      <Badge tone={article.kind === "japanvip" ? "success" : "muted"} label={KIND_LABEL[article.kind]} />
+                      {article.kind === "japanvip" && <Badge tone={article.approvalStatus === "approved" ? "success" : article.approvalStatus === "rejected" ? "danger" : "running"} label={article.approvalStatus === "approved" ? "Đã duyệt" : article.approvalStatus === "rejected" ? "Đã loại" : "Chờ duyệt"} />}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{article.siteName || "Nguồn web"}{article.tags.length ? ` · ${article.tags.join(", ")}` : ""}</p>
+                  </div>
+                  {review && <div className="shrink-0 text-right"><p className={`text-lg font-bold ${passesGate ? "text-emerald-600" : "text-amber-600"}`}>{approvalReview?.totalScore ?? review.totalScore}/100</p><p className="text-[11px] text-[var(--text-muted)]">Chính xác {approvalReview?.accuracyScore ?? review.accuracyScore}</p></div>}
+                </summary>
+                <div className="border-t border-[var(--border)] p-4">
                 <div className="flex items-start gap-3">
                   {article.kind !== "japanvip" ? <input
                     className="mt-1 h-4 w-4 accent-[var(--primary)]"
@@ -245,7 +260,8 @@ export default function JapanVipLearningPage() {
                     <Trash2 size={14} />
                   </IconButton>
                 </div>
-              </div>
+                </div>
+              </details>
             );})}
             {library.articles.length === 0 && <p className="py-8 text-center text-sm text-[var(--text-muted)]">Chưa có bài tham khảo. Hãy thêm những bài bạn thực sự đánh giá cao.</p>}
           </div>
