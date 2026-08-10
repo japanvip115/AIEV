@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { query, type Query } from "@anthropic-ai/claude-agent-sdk";
+import { pickMainModel, type ModelUsageLike } from "./claudeModel.js";
 import { hasClaudeAuth, paths, repoRoot } from "./config.js";
 import * as db from "./db.js";
 import { broadcast } from "./events.js";
@@ -39,6 +40,8 @@ interface AgentMessage {
   };
   input_tokens?: number;
   output_tokens?: number;
+  /** Token tách theo từng model của lượt chạy - nguồn để biết model THẬT (claudeModel.ts) */
+  modelUsage?: Record<string, ModelUsageLike>;
   [key: string]: unknown;
 }
 
@@ -398,7 +401,10 @@ export async function runAgent(
           const outTok = msg.usage?.output_tokens ?? msg.output_tokens ?? 0;
           const cost = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
           if (inTok > 0 || outTok > 0 || cost > 0) {
-            db.addTokenUsage(sessionId, session?.projectId ?? null, inTok, outTok, cost);
+            // Model THẬT do SDK báo; không có thì lấy model đã lưu trên phiên
+            // (đường cũ, vẫn đúng cho phiên chat thường).
+            const model = pickMainModel(msg.modelUsage) ?? session?.model ?? null;
+            db.addTokenUsage(sessionId, session?.projectId ?? null, inTok, outTok, cost, "claude", model);
           }
         } catch {
           /* usage là phụ - không để hỏng luồng chính */

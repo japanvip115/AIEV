@@ -79,7 +79,7 @@ export async function generateOllamaText(input: {
     const outputTokens = data.eval_count ?? 0;
     try {
       if (inputTokens > 0 || outputTokens > 0) {
-        addTokenUsage(`${input.usageTag}_${nanoid(8)}`, input.projectId ?? null, inputTokens, outputTokens, 0, "ollama");
+        addTokenUsage(`${input.usageTag}_${nanoid(8)}`, input.projectId ?? null, inputTokens, outputTokens, 0, "ollama", OLLAMA_TEXT_MODEL);
       }
     } catch {
       // Thống kê là phụ.

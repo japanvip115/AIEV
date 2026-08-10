@@ -34,25 +34,48 @@ export interface ModelPrice {
  */
 export const MODEL_PRICES: Record<string, ModelPrice> = {
   // ----- Anthropic -----
+  // Mọi id trong danh sách chọn model của UI (routes/providers.ts CLAUDE_MODELS)
+  // đều phải có mặt ở đây, kể cả model cũ: thiếu một dòng là bảng Dashboard bỏ
+  // trống ô $ của đúng model đó.
   "claude-fable-5": { inPerM: 10, outPerM: 50 },
   "claude-mythos-5": { inPerM: 10, outPerM: 50 },
   "claude-opus-5": { inPerM: 5, outPerM: 25 },
   "claude-opus-4-8": { inPerM: 5, outPerM: 25 },
   "claude-opus-4-7": { inPerM: 5, outPerM: 25 },
   "claude-opus-4-6": { inPerM: 5, outPerM: 25 },
+  "claude-opus-4-5": { inPerM: 5, outPerM: 25 },
+  "claude-opus-4-1": { inPerM: 15, outPerM: 75 },
+  "claude-opus-4-0": { inPerM: 15, outPerM: 75 },
   // Sonnet 5 đang có giá giới thiệu 2/10 tới hết 31/08/2026; để giá NIÊM YẾT
   // ở đây vì đây là bảng giá chuẩn, còn số tiền thật vẫn lấy từ costUsd.
   "claude-sonnet-5": { inPerM: 3, outPerM: 15 },
   "claude-sonnet-4-6": { inPerM: 3, outPerM: 15 },
+  "claude-sonnet-4-5": { inPerM: 3, outPerM: 15 },
+  "claude-sonnet-4-0": { inPerM: 3, outPerM: 15 },
   "claude-haiku-4-5": { inPerM: 1, outPerM: 5 },
+  "claude-3-haiku-20240307": { inPerM: 0.25, outPerM: 1.25 },
 
-  // ----- Google Gemini -----
-  // Trùng với hằng số đã dùng để TÍNH costUsd trong stt.ts và translate.ts
-  // (GEMINI_PRICE_IN_PER_M / _OUT_PER_M) - hai nơi phải bằng nhau, lệch là
-  // cột tổng và cột $vào/$ra đá nhau vì lý do sai chứ không phải vì cache.
-  "gemini-3.1-flash-image": { inPerM: 0.3, outPerM: 2.5 },
-  "gemini-3.1-flash-lite-image": { inPerM: 0.3, outPerM: 2.5 },
-  "gemini-3-pro-image": { inPerM: 0.3, outPerM: 2.5 },
+  // ----- Google Gemini (văn bản) -----
+  // Đây CŨNG là nguồn để stt.ts và translate.ts tính costUsd (qua `priceFor`),
+  // nên hai nơi bằng nhau theo cấu tạo. KHÔNG hardcode lại đơn giá ở file khác:
+  // lệch một chữ số là cột tổng và cột $vào/$ra đá nhau.
+  "gemini-2.5-flash": { inPerM: 0.3, outPerM: 2.5 },
+  "gemini-2.5-flash-lite": { inPerM: 0.1, outPerM: 0.4 },
+  "gemini-2.5-pro": { inPerM: 1.25, outPerM: 10 },
+
+  // ----- Google Gemini (tạo ảnh) -----
+  // outPerM = 60 là đúng hằng số gemini.ts dùng để tính costUsd của một ảnh.
+  // Trước đây chỗ này ghi 2.5 (giá model văn bản) nên bảng dồn gần hết tiền ảnh
+  // sang cột $vào - sai chiều, dù cột tổng vẫn đúng.
+  "gemini-3.1-flash-image": { inPerM: 0.3, outPerM: 60 },
+  "gemini-3.1-flash-lite-image": { inPerM: 0.3, outPerM: 60 },
+  "gemini-3-pro-image": { inPerM: 0.3, outPerM: 60 },
+
+  // ----- Chạy trên máy / gói thuê bao: KHÔNG tính tiền theo token -----
+  // Ghi 0 chứ không bỏ trống: bỏ trống thì UI hiện "-" và đếm dòng đó vào phần
+  // "chưa phân bổ được", làm người đọc tưởng hệ thống không biết giá. Ở đây
+  // biết rất rõ: bằng 0.
+  "codex-cli-gpt-image-2": { inPerM: 0, outPerM: 0 },
 };
 
 /**
@@ -63,6 +86,12 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
  */
 export const PROVIDER_FALLBACK_PRICES: Record<string, ModelPrice> = {
   gemini: { inPerM: 0.3, outPerM: 2.5 },
+  // Ollama chạy trên máy và Ollama Cloud/Codex CLI đi theo gói thuê bao: token
+  // không quy ra tiền, mọi dòng đều costUsd = 0. Đơn giá 0 cho cả hai chiều để
+  // bảng hiện $0.00 thay vì "-" (xem ghi chú ở MODEL_PRICES).
+  ollama: { inPerM: 0, outPerM: 0 },
+  "ollama-cloud": { inPerM: 0, outPerM: 0 },
+  openai: { inPerM: 0, outPerM: 0 },
 };
 
 /** Đơn giá của một dòng usage; null = không biết, UI phải để trống ô $. */

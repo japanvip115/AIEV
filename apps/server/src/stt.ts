@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { addTokenUsage } from "./db.js";
 import { geminiApiKey } from "./gemini.js";
+import { priceFor, type ModelPrice } from "./pricing.js";
 import { extractAudioWav, probeDurationSec, transcribeVideo } from "./transcribe.js";
 import { parseTranscriptJson } from "./transcript.js";
 import { HttpError, ensureDir, execFileCaptureAll, moveFile, toRepoRel } from "./util.js";
@@ -263,9 +264,14 @@ const GEMINI_CHUNK_SEC = 240;
 /** Hết giờ cho MỘT khúc. 4 phút audio thường xong trong 20-60s; 5 phút là quá rộng. */
 const GEMINI_CHUNK_TIMEOUT_MS = 5 * 60_000;
 
-/** Giá gemini-2.5-flash (USD / 1 triệu token) - chỉ để vẽ biểu đồ Dashboard */
-const GEMINI_PRICE_IN_PER_M = 0.3;
-const GEMINI_PRICE_OUT_PER_M = 2.5;
+/**
+ * Đơn giá lấy từ `pricing.ts` theo ĐÚNG model vừa gọi - cùng một bảng giá với
+ * bảng "Chi phí AI theo model" trên Dashboard, nên số tiền ghi vào và số tiền
+ * hiển thị không thể lệch nhau. Model lạ rơi về đơn giá mặc định của Gemini.
+ */
+function geminiPriceOf(model: string): ModelPrice {
+  return priceFor(model, "gemini") ?? { inPerM: 0.3, outPerM: 2.5 };
+}
 
 interface GeminiTextResponse {
   candidates?: Array<{
@@ -523,14 +529,15 @@ async function runGemini(
     // Kế toán token: phụ trợ, nuốt mọi lỗi (đúng như gemini.ts/translate.ts)
     try {
       if (inTokTotal > 0 || outTokTotal > 0) {
+        const price = geminiPriceOf(model);
         addTokenUsage(
           "stt_gemini",
           null,
           inTokTotal,
           outTokTotal,
-          (inTokTotal * GEMINI_PRICE_IN_PER_M) / 1_000_000 +
-            (outTokTotal * GEMINI_PRICE_OUT_PER_M) / 1_000_000,
+          (inTokTotal * price.inPerM) / 1_000_000 + (outTokTotal * price.outPerM) / 1_000_000,
           "gemini",
+          model,
         );
       }
     } catch {

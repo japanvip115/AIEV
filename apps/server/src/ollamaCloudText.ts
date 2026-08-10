@@ -79,7 +79,7 @@ export async function generateOllamaCloudText(input: {
     const inputTokens = data.usage?.prompt_tokens ?? 0;
     const outputTokens = data.usage?.completion_tokens ?? 0;
     try {
-      if (inputTokens > 0 || outputTokens > 0) addTokenUsage(`${input.usageTag}_${nanoid(8)}`, input.projectId ?? null, inputTokens, outputTokens, 0, "ollama-cloud");
+      if (inputTokens > 0 || outputTokens > 0) addTokenUsage(`${input.usageTag}_${nanoid(8)}`, input.projectId ?? null, inputTokens, outputTokens, 0, "ollama-cloud", OLLAMA_CLOUD_MODEL);
     } catch {
       // Thống kê là phụ, không được làm hỏng tác vụ chính.
     }

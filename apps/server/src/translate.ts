@@ -1,5 +1,6 @@
 import { addTokenUsage } from "./db.js";
 import { geminiApiKey } from "./gemini.js";
+import { priceFor, type ModelPrice } from "./pricing.js";
 
 /**
  * Dịch phụ đề / lời thoại bằng Gemini - dùng cho tính năng "Dịch video".
@@ -56,11 +57,14 @@ const MAX_CUE_CHARS = 40_000;
 const BATCH_TIMEOUT_MS = 3 * 60_000;
 
 /**
- * Giá gemini-2.5-flash (USD / 1 triệu token) - chỉ để vẽ biểu đồ Dashboard,
- * sai số vài phần trăm không ảnh hưởng luồng chính.
+ * Đơn giá lấy từ `pricing.ts` theo ĐÚNG model vừa gọi, không hardcode ở đây:
+ * dịch bằng Pro đắt gấp bốn lần Flash, ghi cứng một con số là bảng Dashboard
+ * báo sai tiền của mọi phiên không dùng model mặc định. Model lạ (Google ra
+ * model mới liên tục) rơi về đơn giá mặc định của nhà cung cấp.
  */
-const PRICE_IN_PER_M = 0.3;
-const PRICE_OUT_PER_M = 2.5;
+function priceOf(model: string): ModelPrice {
+  return priceFor(model, "gemini") ?? { inPerM: 0.3, outPerM: 2.5 };
+}
 
 /** Số lần gọi tối đa cho một lô (1 lần chính + 1 lần dịch lại khi thiếu mục) */
 const MAX_ATTEMPTS = 2;
@@ -478,8 +482,9 @@ export async function translateCues(input: TranslateCuesInput): Promise<{ cues: 
   // hỏng luồng chính nên nuốt mọi lỗi (đúng như gemini.ts).
   try {
     if (inTokTotal > 0 || outTokTotal > 0) {
+      const price = priceOf(model);
       const costUsd =
-        (inTokTotal * PRICE_IN_PER_M) / 1_000_000 + (outTokTotal * PRICE_OUT_PER_M) / 1_000_000;
+        (inTokTotal * price.inPerM) / 1_000_000 + (outTokTotal * price.outPerM) / 1_000_000;
       addTokenUsage(
         `${input.usageTag}_${input.projectId ?? "unknown"}`,
         input.projectId ?? null,
@@ -487,6 +492,7 @@ export async function translateCues(input: TranslateCuesInput): Promise<{ cues: 
         outTokTotal,
         costUsd,
         "gemini",
+        model,
       );
     }
   } catch {

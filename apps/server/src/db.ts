@@ -151,6 +151,16 @@ try {
 } catch {
   /* cột đã tồn tại */
 }
+// Migration: model THẬT của lượt gọi.
+// Trước đây bảng "Chi phí AI theo model" chỉ biết model qua JOIN sang
+// chat_sessions, nên mọi lượt chạy ngoài phiên chat (bóc lời, dịch, tạo ảnh,
+// sinh skill, Ollama, Codex) đều hiện "không rõ" và không tra được đơn giá.
+// Dòng cũ để NULL - vẫn rơi về đường JOIN như trước, không mất dữ liệu.
+try {
+  db.exec("ALTER TABLE token_usage ADD COLUMN model TEXT");
+} catch {
+  /* cột đã tồn tại */
+}
 
 // ---------------------------------------------------------------- Jobs
 
@@ -370,10 +380,12 @@ export function addTokenUsage(
   outputTokens: number,
   costUsd: number,
   provider: "claude" | "gemini" | "openai" | "ollama" | "ollama-cloud" = "claude",
+  /** Model THẬT vừa gọi (vd "gemini-2.5-flash"). Bỏ trống chỉ khi thật sự không biết. */
+  model: string | null = null,
 ): void {
   db.prepare(
-    "INSERT INTO token_usage (sessionId, projectId, inputTokens, outputTokens, costUsd, provider, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(sessionId, projectId, inputTokens, outputTokens, costUsd, provider, nowIso());
+    "INSERT INTO token_usage (sessionId, projectId, inputTokens, outputTokens, costUsd, provider, model, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(sessionId, projectId, inputTokens, outputTokens, costUsd, provider, model, nowIso());
 }
 
 /** Tổng token (input + output) theo projectId */
@@ -495,10 +507,14 @@ export interface UsageByModelRow {
 /**
  * Token + chi phí gộp theo (nhà cung cấp, model).
  *
- * `token_usage` KHÔNG có cột model - model nằm ở `chat_sessions.model`, nên phải
- * LEFT JOIN qua sessionId. LEFT chứ không INNER: dòng usage chạy ngoài phiên chat
- * (STT, dịch, sinh ảnh) có sessionId null hoặc trỏ tới phiên đã xóa, INNER JOIN
- * sẽ nuốt mất chúng và bảng cộng ra ít tiền hơn thực tế.
+ * Model lấy theo thứ tự `COALESCE(u.model, s.model)`:
+ *   1. `token_usage.model` - model THẬT của lượt gọi, do nơi gọi ghi thẳng vào.
+ *      Đây là nguồn đúng nhất và là đường đi của mọi dòng mới.
+ *   2. `chat_sessions.model` qua LEFT JOIN - đường cũ, chỉ còn phục vụ các dòng
+ *      ghi trước khi có cột `model` (dòng cũ để NULL).
+ * LEFT chứ không INNER: dòng usage chạy ngoài phiên chat (STT, dịch, sinh ảnh)
+ * có sessionId null hoặc trỏ tới phiên đã xóa, INNER JOIN sẽ nuốt mất chúng và
+ * bảng cộng ra ít tiền hơn thực tế.
  *
  * `days` bỏ trống = tính từ đầu.
  */
@@ -507,11 +523,14 @@ export function usageByModel(days?: number): UsageByModelRow[] {
   const params = days ? [new Date(Date.now() - days * 86_400_000).toISOString()] : [];
   const rows = db
     .prepare(
-      "SELECT COALESCE(u.provider, 'claude') AS provider, s.model AS model, " +
+      "SELECT COALESCE(u.provider, 'claude') AS provider, COALESCE(u.model, s.model) AS model, " +
         "COALESCE(SUM(u.inputTokens), 0) AS tokensIn, COALESCE(SUM(u.outputTokens), 0) AS tokensOut, " +
         "COALESCE(SUM(u.costUsd), 0) AS costUsd " +
         "FROM token_usage u LEFT JOIN chat_sessions s ON s.sessionId = u.sessionId " +
-        `${where} GROUP BY provider, model ` +
+        // GROUP BY phải viết LẠI nguyên biểu thức, không được gom theo bí danh
+        // `model`: sau khi token_usage có cột model, cả hai bảng đều có cột tên
+        // `model` nên SQLite báo "ambiguous column name" và query chết ngay.
+        `${where} GROUP BY COALESCE(u.provider, 'claude'), COALESCE(u.model, s.model) ` +
         "ORDER BY COALESCE(SUM(u.inputTokens + u.outputTokens), 0) DESC",
     )
     .all(...params) as UsageByModelRow[];

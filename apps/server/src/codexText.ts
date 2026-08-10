@@ -89,7 +89,7 @@ export async function generateCodexText(input: {
     if (totalTokens > 0) {
       try {
         // CLI chỉ trả tổng token; ghi vào input để tổng usage vẫn chính xác, không bịa tách in/out.
-        addTokenUsage(`${input.usageTag}_${nanoid(8)}`, input.projectId ?? null, totalTokens, 0, 0, "openai");
+        addTokenUsage(`${input.usageTag}_${nanoid(8)}`, input.projectId ?? null, totalTokens, 0, 0, "openai", model);
       } catch {
         // Thống kê là phụ, không chặn nội dung.
       }

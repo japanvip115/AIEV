@@ -5,6 +5,7 @@ import matter from "gray-matter";
 import { nanoid } from "nanoid";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { hasClaudeAuth, paths, repoRoot } from "../config.js";
+import { pickMainModel, type ModelUsageLike } from "../claudeModel.js";
 import { addTokenUsage } from "../db.js";
 import { HttpError, ensureDir, isKebabCase, toKebabAscii } from "../util.js";
 
@@ -163,6 +164,7 @@ router.post("/generate", async (req, res) => {
   let inTok = 0;
   let outTok = 0;
   let cost = 0;
+  let modelUsed: string | null = null;
 
   try {
     const q = query({
@@ -182,6 +184,7 @@ router.post("/generate", async (req, res) => {
             cache_read_input_tokens?: number;
             cache_creation_input_tokens?: number;
           };
+          modelUsage?: Record<string, ModelUsageLike>;
         };
         if (msg.type === "result") {
           // Cộng cache vào input như agent.ts
@@ -191,6 +194,8 @@ router.post("/generate", async (req, res) => {
             (msg.usage?.cache_read_input_tokens ?? 0);
           outTok = msg.usage?.output_tokens ?? 0;
           cost = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
+          // Không truyền model nên SDK tự chọn - chỉ `modelUsage` mới biết là model nào
+          modelUsed = pickMainModel(msg.modelUsage);
           if (typeof msg.result === "string") resultText = msg.result;
         }
       }
@@ -221,7 +226,7 @@ router.post("/generate", async (req, res) => {
   // Ghi token đã dùng (kể cả khi output không parse được - token vẫn đã tiêu)
   try {
     if (inTok > 0 || outTok > 0 || cost > 0) {
-      addTokenUsage(`skillgen_${nanoid(8)}`, null, inTok, outTok, cost, "claude");
+      addTokenUsage(`skillgen_${nanoid(8)}`, null, inTok, outTok, cost, "claude", modelUsed);
     }
   } catch {
     /* usage là phụ */

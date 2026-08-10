@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { hasClaudeAuth, repoRoot } from "./config.js";
+import { pickMainModel, type ModelUsageLike } from "./claudeModel.js";
 import { addTokenUsage } from "./db.js";
 import { HttpError } from "./util.js";
 
@@ -53,6 +54,7 @@ export async function generateText(input: {
   let inputTokens = 0;
   let outputTokens = 0;
   let costUsd = 0;
+  let modelUsed: string | null = null;
 
   try {
     const q = query({
@@ -72,6 +74,7 @@ export async function generateText(input: {
             cache_read_input_tokens?: number;
             cache_creation_input_tokens?: number;
           };
+          modelUsage?: Record<string, ModelUsageLike>;
         };
         if (msg.type === "result") {
           // Cộng cache vào input như agent.ts để Dashboard nhất quán
@@ -81,6 +84,9 @@ export async function generateText(input: {
             (msg.usage?.cache_read_input_tokens ?? 0);
           outputTokens = msg.usage?.output_tokens ?? 0;
           costUsd = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
+          // Model THẬT do SDK báo lại; chỉ khi không có mới lấy model được yêu
+          // cầu (bỏ trống = SDK tự chọn mặc định, lúc đó ta cũng không biết).
+          modelUsed = pickMainModel(msg.modelUsage) ?? input.model ?? null;
           if (typeof msg.result === "string") text = msg.result;
         }
       }
@@ -117,6 +123,7 @@ export async function generateText(input: {
           outputTokens,
           costUsd,
           "claude",
+          modelUsed,
         );
       }
     } catch {

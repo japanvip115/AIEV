@@ -346,6 +346,7 @@ export async function generateBackground(input: {
         outTok,
         (outTok * 60) / 1_000_000,
         "gemini",
+        model,
       );
     }
   } catch {
