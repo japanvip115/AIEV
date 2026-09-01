@@ -388,6 +388,18 @@ export function addTokenUsage(
   ).run(sessionId, projectId, inputTokens, outputTokens, costUsd, provider, model, nowIso());
 }
 
+/**
+ * Điền model cho các dòng cũ của MỘT nhà cung cấp chỉ dùng một model duy nhất
+ * (ollama, ollama-cloud, openai/Codex). Trả về số dòng đã điền.
+ * Chỉ chạm dòng `model IS NULL` nên gọi lại nhiều lần vẫn an toàn.
+ */
+export function backfillTokenUsageModel(provider: string, model: string): number {
+  if (!model) return 0;
+  return db
+    .prepare("UPDATE token_usage SET model = ? WHERE provider = ? AND model IS NULL")
+    .run(model, provider).changes;
+}
+
 /** Tổng token (input + output) theo projectId */
 export function tokensByProject(): Record<string, { tokens: number; costUsd: number }> {
   const rows = db

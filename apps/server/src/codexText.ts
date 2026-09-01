@@ -7,6 +7,9 @@ import { addTokenUsage } from "./db.js";
 import { repoRoot } from "./config.js";
 import { HttpError } from "./util.js";
 
+/** Model Codex mặc định khi nơi gọi không chỉ định. */
+export const CODEX_TEXT_MODEL = process.env.CODEX_CLI_TEXT_MODEL || "gpt-5.6-sol";
+
 export interface CodexTextResult {
   text: string;
   inputTokens: number;
@@ -40,7 +43,7 @@ export async function generateCodexText(input: {
 }): Promise<CodexTextResult> {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aiev-codex-text-"));
   const outputFile = path.join(tempDir, "last-message.txt");
-  const model = input.model || process.env.CODEX_CLI_TEXT_MODEL || "gpt-5.6-sol";
+  const model = input.model || CODEX_TEXT_MODEL;
   const args = [
     "exec",
     "--skip-git-repo-check",

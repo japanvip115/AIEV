@@ -13,6 +13,7 @@ import {
 } from "./config.js";
 import { autoResumeStartup } from "./agent.js";
 import { failStaleRunningJobs } from "./db.js";
+import { backfillUsageModels } from "./backfillUsageModel.js";
 import { addSseClient } from "./events.js";
 import { HttpError, cookieValue, isLocalRequest, secretEquals } from "./util.js";
 import { isKnownUploadToken } from "./routes/uploadSession.js";
@@ -61,6 +62,8 @@ import japanVipLearningRouter from "./routes/japanVipLearning.js";
 ensureBaseDirs();
 // Job còn treo "running" từ lần chạy trước (server bị tắt giữa chừng) → failed
 failStaleRunningJobs();
+// Dòng token_usage ghi trước khi bảng có cột model → điền lại model đã dùng
+backfillUsageModels();
 
 const app = express();
 app.disable("x-powered-by");
