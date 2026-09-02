@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   check:
-    name: Typecheck and build
+    name: Verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -34,12 +34,10 @@ jobs:
       # fail nếu lockfile lệch package.json - đúng thứ cần bắt ở PR
       - run: npm ci
 
-      - name: Typecheck (server + web + remotion)
-        run: npm run typecheck
-
-      - name: Build (server + web)
-        run: npm run build
+      - name: Typecheck, contracts, build and sandbox proof
+        run: npm run verify
 
 # KHÔNG chạy render thật ở đây: việc đó cần FFmpeg, Chrome, GPU và khóa
-# Claude/Gemini. Đưa khóa thật vào CI vừa tốn tiền vừa rủi ro lộ, nên CI chỉ
-# gác phần kiểm được tĩnh. Phần hình ảnh/âm thanh vẫn phải người xem và duyệt.
+# Claude/Gemini. Proof image-reference chạy router trong sandbox, scrub toàn bộ
+# khóa provider và stub queue trước khi import route; không gọi provider thật.
+# Chất lượng hình ảnh/âm thanh vẫn phải được người xem và duyệt riêng.

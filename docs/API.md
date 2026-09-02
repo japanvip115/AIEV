@@ -884,12 +884,19 @@ ImageProject = { id, name, prompt, kind: "background"|"3d"|"character"|"texture"
                                       "middle-center"|"middle-right"|"bottom-left"|"bottom-center"|"bottom-right" },
                  model: string|null, styleId: string|null,
                  background: string|null, final: string|null, error: string|null,
+                 productRef: string|null, angleCount: number,
+                 customWidth: number|null, customHeight: number|null, angles: string[],
                  createdAt, updatedAt }
 
 GET    /api/images                → ImageProject[]
 POST   /api/images                { name, prompt, kind, aspect, overlay? } → 201 (id sinh từ name)
 GET    /api/images/:id            → ImageProject
-PUT    /api/images/:id            partial (name/prompt/kind/aspect/overlay) → ImageProject
+PUT    /api/images/:id            partial (name/prompt/kind/aspect/overlay/model/styleId/angleCount/
+                                  customWidth+customHeight) → ImageProject
+                                  `angleCount` số nguyên 1..8 (sai → 400 INVALID_ANGLE_COUNT).
+                                  `customWidth`/`customHeight` là MỘT CẶP: gửi một key phải gửi cả
+                                  hai, và chỉ nhận cả-hai-rỗng hoặc cả-hai-số-nguyên 64..4096
+                                  (sai → 400 INVALID_CUSTOM_SIZE). Xem mục "Ảnh tham chiếu".
                                   `name` đổi TÊN HIỂN THỊ, KHÔNG đổi `id` (id là tên thư mục, bị
                                   tham chiếu ở đường dẫn ảnh và projectId của job). 400 INVALID_NAME
                                   khi rỗng hoặc quá 120 ký tự - cùng luật với video project.
@@ -900,14 +907,89 @@ POST   /api/images/:id/clone      { name? } → ImageProject (201) — nhân b�
                                   là sản phẩm - giữ nền để bản sao compose lại được ngay mà không
                                   phải gọi Gemini lần nữa. Chỉ chép đúng file nền đang dùng, không
                                   chép bản final cũ hay props còn đọng trong thư mục.
+                                  `productRef` ĐƯỢC copy khi file ảnh mẫu còn tồn tại (mẫu là
+                                  NGUYÊN LIỆU, giống nền); file đã mất thì bản sao để productRef = null.
+                                  `angles` KHÔNG copy (đặt []) vì đó là SẢN PHẨM của job, bê sang là
+                                  meta khai có ảnh mà thư mục trống. `angleCount` và cặp
+                                  customWidth/customHeight giữ nguyên theo bản gốc.
                                   Tên bỏ trống → "<tên gốc> (bản sao)"; id mới sinh từ tên.
 DELETE /api/images/:id            → 204
 POST   /api/images/:id/background multipart → ImageProject (tự upload nền, không cần Gemini)
 POST   /api/images/:id/generate   { step?: "all"|"background"|"compose" } → 202 Job (queue type "image-gen")
+POST   /api/images/:id/product-ref multipart (field `file`, PNG/JPG) → ImageProject
+                                  Tải ẢNH SẢN PHẨM THẬT làm mẫu. Xem "Ảnh tham chiếu" bên dưới.
+DELETE /api/images/:id/product-ref → ImageProject — bỏ ảnh mẫu, quay lại đường nền + hoàn thiện.
 GET    /api/images/:id/junk       → { items: [{ relPath, size }], totalBytes } — file rác: props.json,
-                                    staging Remotion img-<id>/ (background/final/meta giữ nguyên)
+                                    staging Remotion img-<id>/, và file tạm `angle-<n>.png.fit.tmp.png`
+                                    còn sót khi ffmpeg chết giữa chừng ở bước cắt khổ.
+                                    KHÔNG BAO GIỜ liệt kê `angle-<n>.png` (ảnh thành phẩm đã tốn quota),
+                                    product-ref.*, background.*, final.png, meta.json.
 POST   /api/images/:id/junk/clean → { freedBytes, deleted } — xóa các mục trên; job running/queued → 409 JOB_RUNNING
 ```
+
+### Ảnh tham chiếu — sinh nhiều góc từ một ảnh sản phẩm thật
+
+Đường đi RIÊNG, không dùng chung với nền + Remotion. Có `productRef` là project chuyển hẳn sang
+đường này: gọi GPT Image 2 qua Codex CLI vẽ lại sản phẩm ở nhiều góc máy, KHÔNG qua Remotion,
+không chèn chữ/logo.
+
+Trường mới trong `ImageProject`:
+
+| Trường | Kiểu | Ý nghĩa |
+|---|---|---|
+| `productRef` | `string\|null` | Tên file ảnh mẫu trong thư mục project (`product-ref.png` hoặc `product-ref.jpg`). ĐẦU VÀO — ngược vai với `background` là ĐẦU RA. `null` = chạy y hệt đường sinh ảnh cũ. |
+| `angleCount` | `number` | Số ảnh sinh mỗi lượt, số nguyên 1..8. Mỗi ảnh tốn một lượt quota ảnh ChatGPT và 1–2 phút. |
+| `customWidth` / `customHeight` | `number\|null` | Cỡ px đích, ĐI THEO CẶP. Chỉ có hiệu lực khi ĐỦ CẢ HAI; thiếu một cạnh thì job dùng cỡ theo `aspect`. Chỉ áp cho đường ảnh tham chiếu, KHÔNG đụng khung Remotion. |
+| `angles` | `string[]` | File đã sinh (`angle-1.png`…). **TẤT CẢ đều là ảnh AI DỰNG LẠI, không phải ảnh chụp thật** — chỉ dùng cho video và bài viết, **không được đưa vào bộ ảnh gallery sản phẩm**. Góc nào ảnh mẫu không thấy thì AI tự bịa. |
+
+**POST /api/images/:id/product-ref** — multipart, field `file`, chỉ nhận PNG/JPG (`.jpeg` quy về `.jpg`);
+đuôi khác → `400 INVALID_PRODUCT_REF`, thiếu file → `400 FILE_REQUIRED`. Ghi thành `product-ref.<ext>`.
+
+*Replace semantics*: cũng chính endpoint này dùng để THAY ảnh mẫu — không có endpoint replace riêng.
+Server xoá `product-ref.png` lẫn `product-ref.jpg` cũ (kể cả khi đổi đuôi), rồi **dọn toàn bộ loạt ảnh
+cũ**: xoá đúng file khớp `angle-<n>.png` và `angle-<n>.png.fit.tmp.png`, và đặt `angles: []`.
+Loạt cũ được vẽ theo sản phẩm CŨ; nếu giữ lại, người dùng rất dễ lấy nhầm ảnh của sản phẩm cũ.
+`background.*`, `final.png`, `meta.json`, `props.json` KHÔNG bị đụng.
+
+**DELETE /api/images/:id/product-ref** — bỏ ảnh mẫu, dọn loạt ảnh theo đúng luật trên, `productRef: null`.
+
+*Trạng thái sau khi dọn* (cả POST lẫn DELETE): `error` về `null`; `status` chỉ giữ `"done"` khi
+`final` còn khai VÀ file `final` thật sự còn trên đĩa, ngược lại về `"draft"` — vì `angles` vừa bị
+xoá sạch nên badge "Hoàn thành" sẽ nói dối.
+
+*Khoá khi có job*: cả POST lẫn DELETE trả `409 JOB_RUNNING` nếu project đang có job `running`/`queued`.
+Job đọc lại file mẫu ở MỖI ảnh trong loạt, đổi giữa chừng là Codex CLI mất file và vẽ tiếp bằng
+tưởng tượng — sai sản phẩm mà không có lỗi nào báo ra.
+
+*Cache bust*: tên file luôn là `product-ref.png|jpg` nên URL không đổi khi thay ảnh. Mọi lần ghi meta
+đều làm mới `updatedAt` (mili-giây), và web ghép `?v=<updatedAt>` vào URL ảnh — thiếu tham số này thì
+trình duyệt hiện ảnh sản phẩm CŨ trong khi job đã đọc file mới.
+
+**Ràng buộc validate** (`PUT /api/images/:id`):
+
+- `angleCount` — số nguyên 1..8. Sai → `400 INVALID_ANGLE_COUNT`. Server **reject chứ không clamp
+  im lặng**: gõ nhầm `50` mà tự hiểu thành `8` là người dùng ngồi đợi một loạt khác hẳn cái họ đặt.
+  Nhận số nguyên JSON và chuỗi toàn chữ số; từ chối thập phân, `"1e3"`, `true`, chuỗi rỗng.
+- `customWidth`/`customHeight` — **hợp đồng CẶP**. Gửi một key thì phải gửi cả hai, nếu không →
+  `400 INVALID_CUSTOM_SIZE`. Chỉ nhận đúng hai dạng: **cả hai rỗng** (`null` hoặc `""` — bỏ cỡ tuỳ
+  chỉnh, quay về cỡ theo `aspect`) hoặc **cả hai là số nguyên 64..4096**. Một cạnh có số một cạnh
+  rỗng cũng là `400`. Validate xong hết mới ghi — request bị từ chối KHÔNG chạm `meta.json`.
+  Lý do: cỡ nửa cặp là trạng thái vô nghĩa, job âm thầm quay về `aspect` trong khi meta vẫn khai một
+  con số. (Đường ĐỌC vẫn khoan dung với `meta.json` cũ đã lỡ nửa cặp để project cũ còn mở được.)
+- Cạnh lớn hơn ~1254px (cỡ GPT trả về thực tế) vẫn hợp lệ nhưng ffmpeg sẽ PHÓNG TO — ảnh mềm và bệt
+  đi chứ không nét thêm; web cảnh báo tại chỗ.
+
+**Ràng buộc generate** (`POST /api/images/:id/generate`) khi `productRef != null`:
+
+- Chỉ chạy `step: "all"`. `"background"`/`"compose"` → `400 PRODUCT_REF_STEP_UNSUPPORTED`
+  (chúng là hai bước của đường Remotion, đường ảnh mẫu không có).
+- `model` bắt buộc là `codex-cli-gpt-image-2` → nếu không, `400 PRODUCT_REF_MODEL_UNSUPPORTED`.
+- Cả hai chặn TRƯỚC khi tạo job, nên step/model sai KHÔNG tốn suất hàng đợi và KHÔNG đốt quota.
+  Runner còn một lớp chặn thứ hai cho job cũ đã nằm sẵn trong hàng đợi.
+- Cả loạt (tới 8 ảnh) nằm trong ĐÚNG MỘT job, không phải 8 job. Bấm lần hai khi job còn chạy/chờ →
+  `409 JOB_RUNNING`, không xếp thêm batch song song.
+- `meta.angles` được ghi DẦN sau mỗi ảnh: loạt 8 ảnh chạy hơn 10 phút, hỏng ở ảnh thứ 6 mà không ghi
+  thì mất trắng 5 ảnh đã tốn quota.
 
 Pipeline generate: (1) `background` — gọi Gemini tạo ảnh nền theo prompt + kind + aspect,
 prompt được TRỘN với Design System (màu brand, tone) để đồng bộ; không có GEMINI_API_KEY → job fail

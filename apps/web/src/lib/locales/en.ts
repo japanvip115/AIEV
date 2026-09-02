@@ -740,6 +740,7 @@ export const en: Record<string, string> = {
   "imageDetail.generate-all": "Generate all",
   "imageDetail.bg-model": "Background model",
   "imageDetail.gen-bg": "Background (Gemini)",
+  "imageDetail.gen-bg-codex": "Background (GPT Image 2)",
   "imageDetail.need-bg": "A background is required first - generate it with Gemini or upload one.",
   "imageDetail.compose": "Compose (Remotion)",
   "imageDetail.gemini-hint": "Gemini is not connected - add GEMINI_API_KEY to .env, or upload a background manually and then Compose.",
@@ -752,6 +753,67 @@ export const en: Record<string, string> = {
   "imageDetail.save-changes": "Save changes",
   "imageDetail.delete-title": "Delete image project",
   "imageDetail.delete-desc-1": "Delete image project",
+
+  // ===== Image detail: generate multiple angles from a product reference =====
+  "imageRef.section": "Generate angles from a product photo",
+  "imageRef.upload": "Upload product reference",
+  "imageRef.uploading": "Uploading…",
+  "imageRef.upload-title": "Only use this when no official photo exists. GPT will REDRAW the product from this image.",
+  "imageRef.replace": "Replace reference",
+  "imageRef.replace-title": "Pick another photo - angles already generated from the old one will be deleted.",
+  "imageRef.remove": "Remove reference",
+  "imageRef.ref-alt": "Product reference photo",
+  "imageRef.count-label": "Number of images (max {max})",
+  "imageRef.size-label": "Image size (px) — leave BOTH empty to follow the aspect ratio on the left",
+  "imageRef.width-placeholder": "width",
+  "imageRef.height-placeholder": "height",
+  "imageRef.field.count": "Number of images",
+  "imageRef.field.width": "Width",
+  "imageRef.field.height": "Height",
+  "imageRef.err.empty": "{label} cannot be empty ({min}–{max}).",
+  "imageRef.err.integer": "{label} must be a whole number between {min} and {max}.",
+  "imageRef.err.range": "{label} must be between {min} and {max}.",
+  "imageRef.err.pair-hint":
+    " A custom size needs BOTH sides - leave both empty to go back to the aspect-ratio size.",
+  "imageRef.err.saved-still": "Still saved on the server: {count} image(s), {size}.",
+  "imageRef.size-by-aspect": "aspect-ratio size {aspect}",
+  "imageRef.size-px": "{width}×{height} px",
+  "imageRef.warn.one-side":
+    "A custom size only takes effect when both sides are filled in. Still using the aspect-ratio size {aspect}.",
+  "imageRef.warn.upscale":
+    "GPT only returns images around {edge}px. A longer side than that gets upscaled, so the image turns soft and mushy rather than sharper.",
+  "imageRef.quota-note": "Each image costs one ChatGPT image credit and 1–2 minutes. What comes out is",
+  "imageRef.quota-note-strong": "an AI reconstruction",
+  "imageRef.quota-note-tail":
+    ": use it for video and articles, NOT as a product gallery photo.",
+  "imageRef.cta": "Generate {count} image(s) from the reference",
+  "imageRef.cta-title": "Generate {count} angle(s) from the product reference photo with GPT Image 2.",
+  "imageRef.needs-codex-title":
+    "Generating from a reference only works with GPT Image 2 (Codex CLI). Pick the model \"{model}\" in the \"Background model\" field.",
+  "imageRef.needs-codex":
+    "Pick the model \"{model}\" in the \"Background model\" field below to generate from the reference.",
+  "imageRef.step-disabled":
+    "This project uses a product reference - it can only run the whole batch from the button above; there is no background/compose step.",
+  "imageRef.flush-failed":
+    "The number of images or the image size has a value that could not be saved - fix the error shown on the field and click again. No job was created.",
+  "imageRef.gallery": "Images generated from the reference ({count})",
+  "imageRef.gallery-note": "AI reconstructions based on the reference photo — for video and articles.",
+  "imageRef.gallery-note-strong": "Do not use as product gallery photos",
+  "imageRef.gallery-note-tail":
+    ", and check every shot before publishing: whatever the reference does not show, the AI makes up.",
+  "imageRef.open-file": "Open {file}",
+  "imageRef.preset.studio": "White studio",
+  "imageRef.preset.studio-text":
+    "Product photo on a clean white studio background, soft even lighting, a light shadow under the base, no text, no props.",
+  "imageRef.preset.living": "Japanese living room",
+  "imageRef.preset.living-text":
+    "Place the product in a modern Japanese living room: light wood floor, white walls, a large window with sheer curtains, soft afternoon light. The product is the main subject, standing on the floor, correctly scaled against the furniture around it.",
+  "imageRef.preset.kitchen": "Japanese kitchen",
+  "imageRef.preset.kitchen-text":
+    "Place the product in a tidy Japanese kitchen: light wood cabinets, stone countertop, natural daylight. The product is the main subject, correctly scaled against the kitchenware around it.",
+  "imageRef.preset.bedroom": "Bedroom",
+  "imageRef.preset.bedroom-text":
+    "Place the product in a quiet Japanese bedroom: low bed, neutral bedding, a warm bedside lamp, soft evening light. The product sits beside the bed, correctly scaled against the furniture.",
 
   // ===== Image form =====
   "imageForm.kind.background": "Background",

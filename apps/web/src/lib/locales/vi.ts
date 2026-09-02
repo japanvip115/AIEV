@@ -740,6 +740,7 @@ export const vi: Record<string, string> = {
   "imageDetail.generate-all": "Tạo tất cả",
   "imageDetail.bg-model": "Model tạo nền",
   "imageDetail.gen-bg": "Tạo nền (Gemini)",
+  "imageDetail.gen-bg-codex": "Tạo nền (GPT Image 2)",
   "imageDetail.need-bg": "Cần có ảnh nền trước - tạo bằng Gemini hoặc tải lên.",
   "imageDetail.compose": "Hoàn thiện (Remotion)",
   "imageDetail.gemini-hint": "Gemini chưa kết nối - thêm GEMINI_API_KEY vào .env, hoặc tải nền lên thủ công rồi Hoàn thiện thiết kế.",
@@ -752,6 +753,67 @@ export const vi: Record<string, string> = {
   "imageDetail.save-changes": "Lưu thay đổi",
   "imageDetail.delete-title": "Xóa dự án ảnh",
   "imageDetail.delete-desc-1": "Xóa dự án ảnh",
+
+  // ===== Image detail: sinh nhiều góc từ ảnh sản phẩm mẫu =====
+  "imageRef.section": "Sinh nhiều góc từ ảnh sản phẩm",
+  "imageRef.upload": "Tải ảnh sản phẩm mẫu",
+  "imageRef.uploading": "Đang tải…",
+  "imageRef.upload-title": "Chỉ dùng khi không có ảnh hãng. GPT sẽ VẼ LẠI sản phẩm theo ảnh này.",
+  "imageRef.replace": "Thay ảnh mẫu",
+  "imageRef.replace-title": "Chọn ảnh khác - loạt ảnh đã sinh theo ảnh mẫu cũ sẽ bị xoá.",
+  "imageRef.remove": "Bỏ ảnh mẫu",
+  "imageRef.ref-alt": "Ảnh sản phẩm mẫu",
+  "imageRef.count-label": "Số ảnh (tối đa {max})",
+  "imageRef.size-label": "Cỡ ảnh (px) — để trống CẢ HAI thì theo tỉ lệ ở cột trái",
+  "imageRef.width-placeholder": "rộng",
+  "imageRef.height-placeholder": "cao",
+  "imageRef.field.count": "Số ảnh",
+  "imageRef.field.width": "Chiều rộng",
+  "imageRef.field.height": "Chiều cao",
+  "imageRef.err.empty": "{label} không được để trống ({min}–{max}).",
+  "imageRef.err.integer": "{label} phải là số nguyên từ {min} đến {max}.",
+  "imageRef.err.range": "{label} phải từ {min} đến {max}.",
+  "imageRef.err.pair-hint":
+    " Cỡ tuỳ chỉnh cần CẢ HAI cạnh - để trống cả hai thì quay lại cỡ theo tỉ lệ.",
+  "imageRef.err.saved-still": "Giá trị đang lưu vẫn là: {count} ảnh, {size}.",
+  "imageRef.size-by-aspect": "cỡ theo tỉ lệ {aspect}",
+  "imageRef.size-px": "{width}×{height} px",
+  "imageRef.warn.one-side":
+    "Phải nhập cả hai cạnh thì cỡ tuỳ chỉnh mới có hiệu lực. Hiện vẫn đang dùng cỡ theo tỉ lệ {aspect}.",
+  "imageRef.warn.upscale":
+    "GPT chỉ trả ảnh khoảng {edge}px. Cạnh lớn hơn thế sẽ bị phóng to nên ảnh mềm và bệt đi, không nét thêm.",
+  "imageRef.quota-note": "Mỗi ảnh tốn một lượt quota ChatGPT và 1–2 phút. Ảnh sinh ra là",
+  "imageRef.quota-note-strong": "hàng AI dựng lại",
+  "imageRef.quota-note-tail":
+    ": dùng cho video và bài viết, KHÔNG dùng làm ảnh gallery sản phẩm.",
+  "imageRef.cta": "Sinh {count} ảnh từ mẫu",
+  "imageRef.cta-title": "Sinh {count} ảnh góc từ ảnh sản phẩm mẫu bằng GPT Image 2.",
+  "imageRef.needs-codex-title":
+    "Sinh ảnh từ mẫu chỉ chạy với GPT Image 2 (Codex CLI). Chọn model \"{model}\" ở ô \"Model tạo nền\".",
+  "imageRef.needs-codex":
+    "Chọn model \"{model}\" ở ô \"Model tạo nền\" bên dưới thì mới sinh được ảnh từ mẫu.",
+  "imageRef.step-disabled":
+    "Dự án đang dùng ảnh sản phẩm mẫu - chỉ chạy được cả loạt bằng nút phía trên, không có bước nền/Hoàn thiện.",
+  "imageRef.flush-failed":
+    "Số ảnh hoặc cỡ ảnh đang có giá trị chưa lưu được - sửa theo lỗi ở ô nhập rồi bấm lại. Chưa tạo job nào.",
+  "imageRef.gallery": "Ảnh sinh từ mẫu ({count})",
+  "imageRef.gallery-note": "Ảnh do AI dựng lại theo ảnh mẫu — dùng cho video và bài viết.",
+  "imageRef.gallery-note-strong": "Không dùng làm ảnh gallery sản phẩm",
+  "imageRef.gallery-note-tail":
+    ", và hãy soi lại từng tấm trước khi đăng: góc nào ảnh mẫu không thấy thì AI tự bịa.",
+  "imageRef.open-file": "Mở {file}",
+  "imageRef.preset.studio": "Studio nền trắng",
+  "imageRef.preset.studio-text":
+    "Ảnh sản phẩm trên nền trắng studio sạch, ánh sáng mềm đều, đổ bóng nhẹ dưới chân máy, không có chữ, không có đạo cụ.",
+  "imageRef.preset.living": "Phòng khách Nhật",
+  "imageRef.preset.living-text":
+    "Đặt sản phẩm trong phòng khách Nhật Bản hiện đại: sàn gỗ sáng, tường trắng, cửa sổ lớn có rèm voan, nắng chiều dịu. Sản phẩm là chủ thể chính, đặt trên sàn, tỉ lệ đúng với đồ nội thất xung quanh.",
+  "imageRef.preset.kitchen": "Bếp Nhật",
+  "imageRef.preset.kitchen-text":
+    "Đặt sản phẩm trong gian bếp Nhật Bản gọn gàng: tủ bếp gỗ sáng màu, mặt đá, ánh sáng tự nhiên ban ngày. Sản phẩm là chủ thể chính, tỉ lệ đúng với đồ bếp xung quanh.",
+  "imageRef.preset.bedroom": "Phòng ngủ",
+  "imageRef.preset.bedroom-text":
+    "Đặt sản phẩm trong phòng ngủ Nhật Bản yên tĩnh: giường thấp, chăn ga màu trung tính, đèn ngủ ấm, ánh sáng dịu buổi tối. Sản phẩm đặt cạnh giường, tỉ lệ đúng với nội thất.",
 
   // ===== Image form =====
   "imageForm.kind.background": "Background",

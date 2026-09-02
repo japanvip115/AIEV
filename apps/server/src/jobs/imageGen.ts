@@ -10,9 +10,13 @@ import {
   buildImagePrompt,
 } from "../gemini.js";
 import {
+  ANGLE_FILE_RE,
+  GPT_NATIVE_EDGE,
   IMAGE_GEN_STEPS,
+  MAX_ANGLE_COUNT,
   imageDirOf,
   readImageMeta,
+  targetSizeOf,
   writeImageMeta,
   type ImageGenStep,
 } from "../imageMeta.js";
@@ -43,6 +47,28 @@ export async function runImageGen(ctx: JobCtx): Promise<void> {
   writeImageMeta(id, meta);
 
   try {
+    // Có ảnh sản phẩm mẫu → đi đường riêng: sinh N ảnh góc khác nhau từ mẫu.
+    // KHÔNG qua Remotion vì đây là ảnh sản phẩm thô, không chèn chữ hay logo.
+    if (meta.productRef) {
+      // CHỈ "all" mới được sinh loạt góc. "background" và "compose" là hai bước
+      // của đường nền + Remotion, đường ảnh mẫu không có chúng. Im lặng chạy
+      // loạt thay thế là bấm một nút mà người dùng tưởng rẻ (một ảnh nền) rồi
+      // đốt tới MAX_ANGLE_COUNT lượt quota ChatGPT.
+      // Route đã chặn trước createJob; đây là lớp thứ hai cho job cũ còn nằm
+      // trong hàng đợi từ trước khi có luật này, hoặc job xếp qua đường khác.
+      if (step !== "all") {
+        throw new Error(
+          `Dự án đang dùng ảnh sản phẩm mẫu nên không chạy được bước "${step}" (nền/Hoàn thiện là của đường Remotion). Bấm Tạo ảnh để sinh loạt ảnh góc, hoặc bỏ ảnh mẫu để quay lại đường nền + hoàn thiện.`,
+        );
+      }
+      await stepProductAngles(ctx, id);
+      const done = readImageMeta(id);
+      done.status = "done";
+      done.error = null;
+      writeImageMeta(id, done);
+      return;
+    }
+
     if (step === "all" || step === "background") await stepBackground(ctx, id);
     if (step === "all" || step === "compose") await stepCompose(ctx, id);
 
@@ -63,6 +89,136 @@ export async function runImageGen(ctx: JobCtx): Promise<void> {
     }
     throw err;
   }
+}
+
+// ---- step product-angles: sinh N ảnh từ ảnh sản phẩm mẫu ----------------
+
+/**
+ * Góc máy mặc định cho từng ảnh trong loạt. Không có cái này thì N lượt gọi
+ * cùng một prompt sẽ ra N ảnh gần như giống hệt nhau - phí sạch quota.
+ * Prompt người dùng vẫn dẫn dắt (studio hay đặt trong nhà); dòng này chỉ xoay
+ * máy quay quanh sản phẩm.
+ */
+const ANGLE_HINTS = [
+  "straight-on front view at eye level",
+  "three-quarter view from the front left",
+  "three-quarter view from the front right",
+  "direct side profile from the left",
+  "three-quarter view from the rear right",
+  "slightly elevated view looking down at about 30 degrees",
+  "low angle looking slightly up",
+  "tight close-up on the control panel and upper front",
+];
+
+/** Co/cắt ảnh vuông của GPT về đúng khổ tỉ lệ. Dùng ffmpeg - AIEV vốn đã bắt buộc có. */
+async function fitToAspect(
+  ctx: JobCtx,
+  file: string,
+  size: { width: number; height: number },
+): Promise<void> {
+  // Đuôi vẫn phải khớp ANGLE_FILE_RE để lần chạy sau quét dọn được: ffmpeg chết
+  // giữa chừng (hết đĩa, ảnh vào hỏng) là file tạm nằm lại vĩnh viễn, mà nó
+  // không nằm trong danh sách "file rác" nào cả.
+  const tmp = `${file}.fit.tmp.png`;
+  const { width: w, height: h } = size;
+  try {
+    await ctx.exec(
+      "ffmpeg",
+      [
+        "-y",
+        "-i",
+        file,
+        "-vf",
+        `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`,
+        tmp,
+      ],
+      path.dirname(file),
+    );
+    fs.renameSync(tmp, file);
+  } finally {
+    // rename thành công thì tmp đã biến mất - rm dư thừa là vô hại.
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
+async function stepProductAngles(ctx: JobCtx, id: string): Promise<void> {
+  const meta = readImageMeta(id);
+  if (!meta.productRef) throw new Error("Chưa có ảnh sản phẩm mẫu.");
+  if (meta.model !== CODEX_CLI_IMAGE_MODEL) {
+    throw new Error(
+      "Sinh ảnh từ mẫu chỉ chạy với GPT Image 2 (Codex CLI). Chọn model đó trong ô \"Model tạo nền\".",
+    );
+  }
+
+  const dir = imageDirOf(id);
+  const refFile = path.join(dir, meta.productRef);
+  if (!fs.existsSync(refFile)) {
+    throw new Error(`Không tìm thấy ảnh mẫu ${meta.productRef} - hãy tải lại.`);
+  }
+
+  // Xoá loạt cũ TRƯỚC khi chạy: lần trước sinh 5 ảnh, lần này 2 thì angle-3..5
+  // nằm lại trên đĩa mà không ai tham chiếu - chạy vài lần là đọng cả trăm MB.
+  // Quét cả file tạm .fit.tmp.png của lần ffmpeg chết giữa chừng.
+  for (const f of fs.readdirSync(dir)) {
+    if (ANGLE_FILE_RE.test(f)) fs.rmSync(path.join(dir, f), { force: true });
+  }
+  // Và xoá luôn DANH SÁCH cũ trong meta, không chỉ file trên đĩa. Hỏng ngay ảnh
+  // đầu (hết quota, chưa login codex) mà meta vẫn khai 5 ảnh của lần trước là
+  // web hiện 5 ô ảnh vỡ, trỏ vào file vừa bị xoá ở ngay trên.
+  const cleared = readImageMeta(id);
+  cleared.angles = [];
+  writeImageMeta(id, cleared);
+
+  const count = Math.min(Math.max(meta.angleCount, 1), MAX_ANGLE_COUNT);
+  const size = targetSizeOf(meta);
+  const custom = Boolean(meta.customWidth && meta.customHeight);
+  // Báo GPT đúng tỉ lệ đang cần. Thực tế nó vẫn trả ảnh vuông nên đây chỉ là
+  // gợi ý bố cục - khâu cắt của ffmpeg mới quyết định khổ cuối.
+  const aspectHint = custom ? `${size.width}:${size.height}` : meta.aspect;
+  const made: string[] = [];
+
+  if (custom && Math.max(size.width, size.height) > GPT_NATIVE_EDGE) {
+    ctx.log(
+      `[product-angles] cỡ ${size.width}x${size.height} lớn hơn ảnh gốc GPT (~${GPT_NATIVE_EDGE}px) - ảnh sẽ bị phóng to và mềm đi`,
+    );
+  }
+
+  for (let i = 0; i < count; i++) {
+    const outName = `angle-${i + 1}.png`;
+    const outFile = path.join(dir, outName);
+    const angle = ANGLE_HINTS[i % ANGLE_HINTS.length];
+    // 5..85%: chừa đầu/cuối cho khâu chuẩn bị và ghi meta
+    const pct = 5 + Math.round((i / count) * 80);
+    ctx.progress(pct, `Ảnh ${i + 1}/${count} - ${angle}`);
+
+    const prompt = [
+      meta.prompt.trim() || "Clean product photo on a plain white studio background.",
+      `Camera angle for this image: ${angle}.`,
+    ].join("\n");
+
+    await generateBackgroundWithCodexCli({
+      ctx,
+      prompt,
+      aspect: aspectHint,
+      outFile,
+      refFile,
+      // Giữ thanh tiến độ ở đúng ô ảnh đang chạy thay vì để codexImage kéo ngược
+      // về thang một-ảnh của nó.
+      onRetry: (turn, maxTurns) =>
+        ctx.progress(pct, `Ảnh ${i + 1}/${count} - chờ Codex CLI (lượt ${turn}/${maxTurns})`),
+    });
+    await fitToAspect(ctx, outFile, size);
+    made.push(outName);
+
+    // Ghi dần sau MỖI ảnh: loạt 8 ảnh chạy hơn 10 phút, hỏng ở ảnh thứ 6 mà
+    // không ghi thì mất trắng 5 ảnh đã tốn quota.
+    const partial = readImageMeta(id);
+    partial.angles = made.slice();
+    writeImageMeta(id, partial);
+  }
+
+  ctx.progress(95, `Xong ${made.length} ảnh`);
+  ctx.log(`[product-angles] đã sinh ${made.length} ảnh từ ${meta.productRef}`);
 }
 
 // ---- step background: Gemini tạo ảnh nền -------------------------------

@@ -694,10 +694,48 @@ export interface ImageProject {
   background: string | null;
   /** relPath ảnh hoàn thiện (Remotion compose) - phát qua /media. */
   final: string | null;
+  /** Ảnh sản phẩm THẬT tải lên làm mẫu (đầu vào, khác background là đầu ra). */
+  productRef: string | null;
+  /** Số ảnh sinh từ mẫu, 1..MAX_ANGLE_COUNT_UI. */
+  angleCount: number;
+  /** Cỡ px tuỳ chỉnh cho ảnh sinh từ mẫu - null = theo tỉ lệ. Đi theo cặp. */
+  customWidth: number | null;
+  customHeight: number | null;
+  /** Ảnh đã sinh từ mẫu - ĐỀU là ảnh AI dựng, không phải ảnh chụp thật. */
+  angles: string[];
   error: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * BẢN SAO các hằng số của server cho đường sinh ảnh từ mẫu.
+ *
+ * `apps/web` không import được `apps/server` (tsconfig của web chỉ include
+ * `apps/web`, và module server kéo theo `fs`/`path` nên bundle Next sẽ vỡ), nên
+ * mấy con số dưới đây là CHÉP TAY và có thể lệch khi ai đó sửa một bên.
+ *
+ * Lệch thì hỏng tới đâu: server là chốt chặn thật - route reject chứ không clamp
+ * (`parseAngleCount`, nhánh customWidth/customHeight trong PUT /api/images/:id),
+ * và UI hiển thị nguyên văn message lỗi của server. Nên drift chỉ làm ô nhập
+ * rộng/hẹp hơn thực tế rồi ăn một lỗi 400 khó hiểu, KHÔNG làm job chạy sai số.
+ *
+ * Sửa giá trị ở `apps/server/src/imageMeta.ts` thì sửa luôn ở đây - gom hết vào
+ * một chỗ trong web để chỉ có đúng một điểm cần đồng bộ.
+ */
+/** Trần số ảnh mỗi lượt - phải khớp MAX_ANGLE_COUNT của server. */
+export const MAX_ANGLE_COUNT_UI = 8;
+/** Biên cỡ tuỳ chỉnh - phải khớp CUSTOM_SIZE_MIN/MAX của server. */
+export const CUSTOM_SIZE_MIN_UI = 64;
+export const CUSTOM_SIZE_MAX_UI = 4096;
+/** Cạnh ảnh GPT trả về - vượt mốc này là ffmpeg phóng to, ảnh mềm đi. */
+export const GPT_NATIVE_EDGE_UI = 1254;
+/**
+ * Model DUY NHẤT chạy được đường sinh ảnh từ mẫu - phải khớp
+ * `CODEX_CLI_IMAGE_MODEL` của `apps/server/src/gemini.ts`. Lệch chuỗi này thì
+ * UI mở nút cho một model mà route sẽ trả 400 `PRODUCT_REF_MODEL_UNSUPPORTED`.
+ */
+export const CODEX_CLI_IMAGE_MODEL_UI = "codex-cli-gpt-image-2";
 
 export type ImageGenStep = "all" | "background" | "compose";
 
@@ -1598,7 +1636,16 @@ export const updateImageProject = (
   patch: Partial<
     Pick<
       ImageProject,
-      "name" | "prompt" | "kind" | "aspect" | "overlay" | "model" | "styleId"
+      | "name"
+      | "prompt"
+      | "kind"
+      | "aspect"
+      | "overlay"
+      | "model"
+      | "styleId"
+      | "angleCount"
+      | "customWidth"
+      | "customHeight"
     >
   >
 ) =>
@@ -1643,6 +1690,25 @@ export const uploadImageBackground = (id: string, file: File) => {
     { method: "POST", body: form }
   );
 };
+
+/**
+ * Upload ảnh SẢN PHẨM THẬT làm mẫu cho GPT vẽ thêm góc (multipart).
+ * Khác uploadImageBackground: nền là đầu ra, cái này là đầu vào.
+ */
+export const uploadImageProductRef = (id: string, file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return request<ImageProject>(
+    `${serverOrigin()}/api/images/${encodeURIComponent(id)}/product-ref`,
+    { method: "POST", body: form }
+  );
+};
+
+/** Bỏ ảnh mẫu → dự án quay lại đường sinh ảnh thường. */
+export const deleteImageProductRef = (id: string) =>
+  request<ImageProject>(`/api/images/${encodeURIComponent(id)}/product-ref`, {
+    method: "DELETE",
+  });
 
 /** Chạy pipeline tạo ảnh - trả Job (queue type "image-gen", projectId = id ảnh). */
 export const generateImage = (id: string, step?: ImageGenStep) =>
